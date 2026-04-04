@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  swarm-gateway:
+    image: ghcr.io/kingsleyonoh/swarm-intelligence-gateway:latest
+    container_name: swarm-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.swarm-gateway.rule=Host(`swarm.kingsleyonoh.com`)"
+      - "traefik.http.routers.swarm-gateway.tls.certresolver=letsencrypt"
+      - "traefik.http.services.swarm-gateway.loadbalancer.server.port=3000"
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: swarm-postgres
+    restart: unless-stopped
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-swarm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-swarm_gateway}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-swarm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: swarm-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_data:
+  redis_data:

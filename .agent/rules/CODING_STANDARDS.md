@@ -77,7 +77,23 @@ You have a vast library of specialized skills available. **Use them proactively*
 | `chore` | Tooling, workflows, config, dependencies |
 | `style` | Formatting, whitespace, no logic change |
 
-**Scope** = the module, app, or area affected (e.g., `pricing`, `auth`, `db`, `workflows`).
+**Scope** = the module or area affected. Valid scopes for this project:
+
+| Scope | Area |
+|-------|------|
+| `poller` | WorldMonitor polling (`src/worldmonitor/`) |
+| `transformer` | Data transformation (`src/transformer/`) |
+| `mirofish` | MiroFish orchestration (`src/mirofish/`) |
+| `memory` | Custom graph store (`src/memory/`) |
+| `api` | API routes + middleware (`src/api/`) |
+| `jobs` | Background jobs + queue (`src/jobs/`) |
+| `db` | Schema, migrations (`src/db/`) |
+| `shared` | Shared utilities (`src/shared/`) |
+| `config` | Configuration (`src/config/`) |
+| `auth` | Tenant auth middleware |
+| `frontend` | Swarm variant UI (`packages/frontend/`) |
+| `deploy` | Docker, CI/CD, deployment |
+| `workflows` | AI workflow system |
 
 **Rules:**
 - Subject line max 72 characters.
@@ -87,12 +103,16 @@ You have a vast library of specialized skills available. **Use them proactively*
 
 **Examples:**
 ```
-feat(pricing): implement UndercutBracket model with tenant FK
-fix(sending): guard against None accounts on sending page
-refactor(db): extract monitoring queries into dedicated mixin
-test(replies): add 11 tests for intent classification edge cases
-docs(context): update CODEBASE_CONTEXT.md with new schema tables
-chore(workflows): add sprint velocity to resume workflow
+feat(poller): implement WorldMonitor Redis polling with package validation
+feat(transformer): generate Markdown seed documents from simulation packages
+feat(mirofish): orchestrate full graph → sim → report pipeline
+feat(memory): implement pgvector semantic episode search
+feat(api): add cursor-based pagination to simulation endpoints
+fix(auth): guard against missing X-API-Key header
+refactor(db): extract tenant scoping into query helper
+test(api): add 8 tests for prediction query edge cases
+docs(context): update CODEBASE_CONTEXT.md with graph store schema
+chore(deploy): configure GitHub Actions → GHCR → Hetzner pipeline
 ```
 
 ## AI Discipline Rules (Prevent Common AI Failures)
@@ -168,16 +188,10 @@ chore(workflows): add sprint velocity to resume workflow
 - **Max 200 lines** per class.
 
 ## PowerShell Environment
-- **ALWAYS activate the virtual environment before ANY `python` or `pip` command:**
-  ```powershell
-  .\venv\Scripts\Activate.ps1
-  ```
-- **NEVER run `pip install` without the venv active.** This installs to system Python and breaks other projects.
-- Verify venv is active: prompt shows `(venv)` prefix. If not, activate first.
 - Use `;` to chain commands, **NEVER** `&&`
-- **NEVER use inline `python -c "..."`** for complex code. Write a `.py` file instead.
 - Special characters that break PowerShell: `|`, `>`, `<`, `$`, `()`, `{}`
-- Write Python scripts to files instead of inline commands.
+- Use `npm run` for all project commands (test, build, lint, dev, etc.)
+- **NEVER run `npm install -g`** — use project-local dependencies only.
 
 ## Git Branching Strategy
 
