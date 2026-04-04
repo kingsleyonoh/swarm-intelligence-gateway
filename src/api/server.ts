@@ -4,6 +4,7 @@ import { registerErrorHandler } from './middleware/error-handler.js';
 import { registerAuthDecorator } from './middleware/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { tenantRoutes } from './routes/tenants.js';
+import { simulationRoutes } from './routes/simulations.js';
 
 /**
  * Build and configure the Fastify application instance.
@@ -24,6 +25,7 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
   // --- Routes ---
   app.register(healthRoutes);
   app.register(tenantRoutes);
+  app.register(simulationRoutes);
 
   return app;
 }
