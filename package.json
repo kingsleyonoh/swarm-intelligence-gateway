@@ -1,0 +1,40 @@
+{
+  "name": "swarm-intelligence-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "db:migrate": "drizzle-kit migrate",
+    "db:generate": "drizzle-kit generate",
+    "setup": "tsx src/scripts/setup.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "bullmq": "^5.73.0",
+    "drizzle-orm": "^0.45.2",
+    "fastify": "^5.8.4",
+    "ioredis": "^5.10.1",
+    "node-cron": "^4.2.1",
+    "pino": "^10.3.1",
+    "postgres": "^3.4.8",
+    "undici": "^7.24.7",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "@types/node-cron": "^3.0.11",
+    "dotenv": "^17.4.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}
