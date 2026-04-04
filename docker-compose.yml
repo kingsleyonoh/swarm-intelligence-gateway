@@ -1,0 +1,58 @@
+# =============================================================================
+# Swarm Intelligence Gateway — Dev Infrastructure
+# =============================================================================
+# Quickstart:
+#   docker compose up -d
+#   docker compose ps
+#
+# Verify PostgreSQL (with pgvector):
+#   psql postgresql://swarm:dev@localhost:5432/swarm_gateway
+#   Or: docker compose exec postgres psql -U swarm -d swarm_gateway -c "SELECT 1;"
+#
+# Verify pgvector extension:
+#   docker compose exec postgres psql -U swarm -d swarm_gateway -c "CREATE EXTENSION IF NOT EXISTS vector; SELECT extversion FROM pg_extension WHERE extname = 'vector';"
+#
+# Verify Redis:
+#   docker compose exec redis redis-cli ping
+#
+# Tear down (keep data):
+#   docker compose down
+#
+# Tear down (destroy data):
+#   docker compose down -v
+# =============================================================================
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: swarm-dev-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: swarm
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: swarm_gateway
+    volumes:
+      - pg_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swarm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: swarm-dev-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_dev_data:
+  redis_dev_data:

@@ -203,13 +203,20 @@ index.ts
 - Error format: `{ error: { code, message, timestamp } }`
 - Ecosystem events: standard envelope `{ event_type, source: "swarm-gateway", tenant_id, timestamp, payload }`
 
+## Deployment Notes
+
+- **Region co-location is mandatory.** The Hetzner VPS (CX33) must be provisioned in the same region as any managed database. Cross-region latency adds 50-100ms per query and compounds across the pipeline.
+- If using **Supabase** for managed PostgreSQL, select the EU region closest to the Hetzner datacenter (e.g., if Hetzner is `fsn1` / Falkenstein, use Supabase `eu-central-1` / Frankfurt).
+- The **production Docker Compose** (`docker-compose.prod.yml`) runs all services on a single host, so there is no cross-region latency between the app, PostgreSQL, and Redis containers.
+- For local development, `docker-compose.yml` runs PostgreSQL (pgvector/pgvector:pg16) on port 5432 and Redis (redis:7-alpine) on port 6379. Start with `docker compose up -d`.
+
 ## Gotchas & Lessons Learned
 
 > Discovered during implementation. Added automatically by `/implement-next` Step 9.3.
 
 | Date | Area | Gotcha | Discovered In |
 |------|------|--------|---------------|
-| | | | |
+| 2026-04-04 | deploy | Hetzner VPS must be co-located with DB region to avoid 50-100ms per-query latency penalty | Batch 001 setup |
 
 ## Shared Foundation (MUST READ before any implementation)
 
