@@ -5,8 +5,8 @@ import { eq, and } from 'drizzle-orm';
 
 import { createTestApp, createTestTenant, cleanupTestTenant } from '../helpers/test-app.js';
 import { db } from '../../src/shared/db.js';
-import { tenants, scenarios, simulations } from '../../src/db/schema/tables.js';
-import { SCENARIO_SOURCE, SIMULATION_STATUS } from '../../src/config/constants.js';
+import { tenants, scenarios, simulations, predictions } from '../../src/db/schema/tables.js';
+import { SCENARIO_SOURCE, SIMULATION_STATUS, PREDICTION_TYPE } from '../../src/config/constants.js';
 
 import type { FastifyInstance } from 'fastify';
 
@@ -449,6 +449,302 @@ describe('GET /api/simulations', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/simulations?cursor=not-a-uuid',
+      headers: { 'x-api-key': testTenant.apiKey },
+    });
+
+    expect(response.statusCode).toBe(400);
+    const body = response.json();
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+// ── GET /api/simulations/:id ──────────────────────────────────────
+
+describe('GET /api/simulations/:id', () => {
+  let app: FastifyInstance;
+  let testTenant: Awaited<ReturnType<typeof createTestTenant>>;
+  let otherTenant: Awaited<ReturnType<typeof createTestTenant>>;
+  const createdScenarioIds: string[] = [];
+  const createdSimulationIds: string[] = [];
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    testTenant = await createTestTenant('Detail Sim Tenant');
+    otherTenant = await createTestTenant('Detail Other Tenant');
+  });
+
+  afterEach(async () => {
+    for (const id of createdSimulationIds) {
+      await db.delete(simulations).where(eq(simulations.id, id));
+    }
+    createdSimulationIds.length = 0;
+
+    for (const id of createdScenarioIds) {
+      await db.delete(simulations).where(eq(simulations.scenarioId, id));
+      await db.delete(scenarios).where(eq(scenarios.id, id));
+    }
+    createdScenarioIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await cleanupTestTenant(testTenant.apiKeyHash);
+    await cleanupTestTenant(otherTenant.apiKeyHash);
+    await app.close();
+  });
+
+  it('should return simulation detail when found', async () => {
+    const scenario = await createTestScenario(testTenant.id);
+    createdScenarioIds.push(scenario.id);
+
+    const sim = await createTestSimulation(testTenant.id, scenario.id);
+    createdSimulationIds.push(sim.id);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/simulations/${sim.id}`,
+      headers: { 'x-api-key': testTenant.apiKey },
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const body = response.json();
+    expect(body).toHaveProperty('id', sim.id);
+    expect(body).toHaveProperty('scenarioId', scenario.id);
+    expect(body).toHaveProperty('status', 'completed');
+    expect(body).toHaveProperty('agentCount', 4096);
+    expect(body).toHaveProperty('roundCount', 5);
+  });
+
+  it('should return 404 when simulation does not exist', async () => {
+    const fakeId = '00000000-0000-0000-0000-000000000000';
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/simulations/${fakeId}`,
+      headers: { 'x-api-key': testTenant.apiKey },
+    });
+
+    expect(response.statusCode).toBe(404);
+
+    const body = response.json();
+    expect(body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('should return 404 when simulation belongs to another tenant', async () => {
+    const otherScenario = await createTestScenario(otherTenant.id, 'Cross Tenant Sim Scenario');
+    createdScenarioIds.push(otherScenario.id);
+
+    const otherSim = await createTestSimulation(otherTenant.id, otherScenario.id);
+    createdSimulationIds.push(otherSim.id);
+
+    // Query as testTenant — should NOT see otherTenant's simulation
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/simulations/${otherSim.id}`,
+      headers: { 'x-api-key': testTenant.apiKey },
+    });
+
+    expect(response.statusCode).toBe(404);
+
+    const body = response.json();
+    expect(body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('should return 401 when no API key provided', async () => {
+    const fakeId = '00000000-0000-0000-0000-000000000000';
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/simulations/${fakeId}`,
+    });
+
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('should return 400 for invalid UUID format', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/simulations/not-a-uuid',
+      headers: { 'x-api-key': testTenant.apiKey },
+    });
+
+    expect(response.statusCode).toBe(400);
+    const body = response.json();
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+// ── GET /api/simulations/:id/report ───────────────────────────────
+
+describe('GET /api/simulations/:id/report', () => {
+  let app: FastifyInstance;
+  let testTenant: Awaited<ReturnType<typeof createTestTenant>>;
+  let otherTenant: Awaited<ReturnType<typeof createTestTenant>>;
+  const createdScenarioIds: string[] = [];
+  const createdSimulationIds: string[] = [];
+  const createdPredictionIds: string[] = [];
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    testTenant = await createTestTenant('Report Sim Tenant');
+    otherTenant = await createTestTenant('Report Other Tenant');
+  });
+
+  afterEach(async () => {
+    for (const id of createdPredictionIds) {
+      await db.delete(predictions).where(eq(predictions.id, id));
+    }
+    createdPredictionIds.length = 0;
+
+    for (const id of createdSimulationIds) {
+      await db.delete(predictions).where(eq(predictions.simulationId, id));
+      await db.delete(simulations).where(eq(simulations.id, id));
+    }
+    createdSimulationIds.length = 0;
+
+    for (const id of createdScenarioIds) {
+      await db.delete(simulations).where(eq(simulations.scenarioId, id));
+      await db.delete(scenarios).where(eq(scenarios.id, id));
+    }
+    createdScenarioIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await cleanupTestTenant(testTenant.apiKeyHash);
+    await cleanupTestTenant(otherTenant.apiKeyHash);
+    await app.close();
+  });
+
+  it('should return report and predictions for completed simulation', async () => {
+    const scenario = await createTestScenario(testTenant.id);
+    createdScenarioIds.push(scenario.id);
+
+    // Create completed simulation with report text
+    const [sim] = await db
+      .insert(simulations)
+      .values({
+        tenantId: testTenant.id,
+        scenarioId: scenario.id,
+        status: SIMULATION_STATUS.COMPLETED,
+        agentCount: 4096,
+        roundCount: 5,
+        llmProvider: 'deepseek',
+        report: '# Swarm Report\n\nPredictions incoming.',
+      })
+      .returning({ id: simulations.id });
+    createdSimulationIds.push(sim.id);
+
+    // Create a prediction tied to this simulation
+    const [prediction] = await db
+      .insert(predictions)
+      .values({
+        tenantId: testTenant.id,
+        simulationId: sim.id,
+        theater: 'Middle East',
+        predictionType: PREDICTION_TYPE.ESCALATION,
+        summary: 'Gulf tensions rising',
+        confidence: '0.85',
+        timeHorizon: 'near-term',
+      })
+      .returning({ id: predictions.id });
+    createdPredictionIds.push(prediction.id);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/simulations/${sim.id}/report`,
+      headers: { 'x-api-key': testTenant.apiKey },
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const body = response.json();
+    expect(body).toHaveProperty('report');
+    expect(body.report).toContain('Swarm Report');
+    expect(body).toHaveProperty('predictions');
+    expect(Array.isArray(body.predictions)).toBe(true);
+    expect(body.predictions).toHaveLength(1);
+    expect(body.predictions[0]).toHaveProperty('theater', 'Middle East');
+    expect(body.predictions[0]).toHaveProperty('predictionType', 'escalation');
+    expect(body.predictions[0]).toHaveProperty('summary', 'Gulf tensions rising');
+  });
+
+  it('should return 404 for pending (not-yet-completed) simulation', async () => {
+    const scenario = await createTestScenario(testTenant.id, 'Pending Report Scenario');
+    createdScenarioIds.push(scenario.id);
+
+    const sim = await createTestSimulation(testTenant.id, scenario.id, SIMULATION_STATUS.PENDING);
+    createdSimulationIds.push(sim.id);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/simulations/${sim.id}/report`,
+      headers: { 'x-api-key': testTenant.apiKey },
+    });
+
+    expect(response.statusCode).toBe(404);
+
+    const body = response.json();
+    expect(body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('should return 404 when simulation does not exist', async () => {
+    const fakeId = '00000000-0000-0000-0000-000000000000';
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/simulations/${fakeId}/report`,
+      headers: { 'x-api-key': testTenant.apiKey },
+    });
+
+    expect(response.statusCode).toBe(404);
+
+    const body = response.json();
+    expect(body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('should return 404 when simulation belongs to another tenant', async () => {
+    const otherScenario = await createTestScenario(otherTenant.id, 'Other Tenant Report Scenario');
+    createdScenarioIds.push(otherScenario.id);
+
+    const [otherSim] = await db
+      .insert(simulations)
+      .values({
+        tenantId: otherTenant.id,
+        scenarioId: otherScenario.id,
+        status: SIMULATION_STATUS.COMPLETED,
+        agentCount: 4096,
+        roundCount: 5,
+        llmProvider: 'deepseek',
+        report: 'Other tenant report',
+      })
+      .returning({ id: simulations.id });
+    createdSimulationIds.push(otherSim.id);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/simulations/${otherSim.id}/report`,
+      headers: { 'x-api-key': testTenant.apiKey },
+    });
+
+    expect(response.statusCode).toBe(404);
+
+    const body = response.json();
+    expect(body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('should return 401 when no API key provided', async () => {
+    const fakeId = '00000000-0000-0000-0000-000000000000';
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/simulations/${fakeId}/report`,
+    });
+
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('should return 400 for invalid UUID format', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/simulations/not-a-uuid/report',
       headers: { 'x-api-key': testTenant.apiKey },
     });
 
