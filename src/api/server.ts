@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 
 import { registerErrorHandler } from './middleware/error-handler.js';
 import { registerAuthDecorator } from './middleware/auth.js';
+import { healthRoutes } from './routes/health.js';
 import { tenantRoutes } from './routes/tenants.js';
 
 /**
@@ -21,6 +22,7 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
   registerAuthDecorator(app);
 
   // --- Routes ---
+  app.register(healthRoutes);
   app.register(tenantRoutes);
 
   return app;
