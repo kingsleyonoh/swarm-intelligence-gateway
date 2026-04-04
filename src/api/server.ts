@@ -1,5 +1,9 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 
+import { registerErrorHandler } from './middleware/error-handler.js';
+import { registerAuthDecorator } from './middleware/auth.js';
+import { tenantRoutes } from './routes/tenants.js';
+
 /**
  * Build and configure the Fastify application instance.
  *
@@ -12,9 +16,12 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
     ...opts,
   });
 
-  // --- Plugins will be registered here ---
+  // --- Global middleware ---
+  registerErrorHandler(app);
+  registerAuthDecorator(app);
 
-  // --- Routes will be registered here ---
+  // --- Routes ---
+  app.register(tenantRoutes);
 
   return app;
 }
