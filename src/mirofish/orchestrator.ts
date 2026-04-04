@@ -1,0 +1,237 @@
+/**
+ * MiroFish Simulation Orchestrator.
+ *
+ * Drives the full simulation pipeline:
+ * 1. Load scenario from DB
+ * 2. Create simulation record (status: queued)
+ * 3. Graph Build Phase (graph_building): seed doc → ontology → build
+ * 4. Simulation Phase (simulating): start sim → poll until complete
+ * 5. Report Phase (reporting): retrieve report → parse predictions
+ * 6. Update status to completed
+ *
+ * Each phase updates the simulation status in DB. On failure, the
+ * simulation is marked as `failed` with the error message stored.
+ */
+
+import { eq, and } from 'drizzle-orm';
+
+import { SIMULATION_STATUS } from '../config/constants.js';
+import { env } from '../config/env.js';
+import { simulations, scenarios } from '../db/schema/tables.js';
+import { ConflictError, NotFoundError } from '../shared/errors.js';
+import { db } from '../shared/db.js';
+import { createChildLogger } from '../shared/logger.js';
+import { generateSeedDocument } from '../transformer/seed-document.js';
+import type { SimPackage } from '../worldmonitor/types.js';
+
+import { MirofishClient } from './client.js';
+import { parsePredictions } from './prediction-parser.js';
+
+import type { MirofishConfig } from './types.js';
+
+const log = createChildLogger({ module: 'orchestrator' });
+
+/**
+ * Convert a DB scenario row to the SimPackage shape expected by transformers.
+ *
+ * DB stores JSONB fields (`theaters`, `entities`, `eventSeeds`, `constraints`)
+ * while SimPackage uses `selectedTheaters` for the theaters field.
+ */
+function toSimPackage(row: Record<string, unknown>): SimPackage {
+  return {
+    runId: (row.worldmonitorRunId as string) ?? '',
+    timestamp: row.createdAt instanceof Date
+      ? row.createdAt.toISOString()
+      : String(row.createdAt ?? ''),
+    title: row.title as string,
+    selectedTheaters: row.theaters as SimPackage['selectedTheaters'],
+    entities: row.entities as SimPackage['entities'],
+    eventSeeds: row.eventSeeds as SimPackage['eventSeeds'],
+    constraints: row.constraints as SimPackage['constraints'],
+    simulationRequirement: row.simulationRequirement as string,
+  };
+}
+
+/** Default timeout for ontology generation polling (10 minutes). */
+const ONTOLOGY_TIMEOUT_MS = 600_000;
+
+/** Default timeout for simulation polling (30 minutes). */
+const SIMULATION_TIMEOUT_MS = 1_800_000;
+
+// ── Orchestrator Parameters ─────────────────────────────────────────
+
+export interface RunSimulationParams {
+  scenarioId: string;
+  tenantId: string;
+  agentCount?: number;
+  roundCount?: number;
+  llmProvider?: string;
+}
+
+// ── Status Update Helper ────────────────────────────────────────────
+
+async function updateSimulationStatus(
+  simulationId: string,
+  status: string,
+  extra: Record<string, unknown> = {},
+): Promise<void> {
+  await db
+    .update(simulations)
+    .set({ status, ...extra })
+    .where(eq(simulations.id, simulationId));
+}
+
+async function failSimulation(
+  simulationId: string,
+  errorMessage: string,
+): Promise<void> {
+  await updateSimulationStatus(simulationId, SIMULATION_STATUS.FAILED, {
+    errorMessage,
+    completedAt: new Date(),
+  });
+}
+
+// ── Public API ──────────────────────────────────────────────────────
+
+/**
+ * Run the full MiroFish simulation pipeline for a scenario.
+ *
+ * @returns The simulation ID created for this run.
+ * @throws NotFoundError if the scenario does not exist.
+ * @throws ConflictError if a simulation already exists for this scenario.
+ */
+export async function runSimulation(
+  params: RunSimulationParams,
+): Promise<string> {
+  const { scenarioId, tenantId } = params;
+  const agentCount = params.agentCount ?? env.DEFAULT_AGENT_COUNT;
+  const roundCount = params.roundCount ?? env.DEFAULT_ROUND_COUNT;
+  const llmProvider = params.llmProvider ?? 'deepseek';
+
+  log.info({ scenarioId, tenantId, agentCount, roundCount }, 'Starting simulation pipeline');
+
+  // ── Step 1: Load scenario ─────────────────────────────────────────
+
+  const [scenario] = await db
+    .select()
+    .from(scenarios)
+    .where(eq(scenarios.id, scenarioId));
+
+  if (!scenario) {
+    throw new NotFoundError(`Scenario not found: ${scenarioId}`);
+  }
+
+  // ── Step 2: Check for existing simulation ─────────────────────────
+
+  const [existingSim] = await db
+    .select()
+    .from(simulations)
+    .where(
+      and(
+        eq(simulations.scenarioId, scenarioId),
+        eq(simulations.tenantId, tenantId),
+      ),
+    );
+
+  if (existingSim) {
+    throw new ConflictError(
+      `Simulation already exists for scenario ${scenarioId}: ${existingSim.id}`,
+    );
+  }
+
+  // ── Step 3: Create simulation record ──────────────────────────────
+
+  const [simulation] = await db
+    .insert(simulations)
+    .values({
+      tenantId,
+      scenarioId,
+      status: SIMULATION_STATUS.QUEUED,
+      agentCount,
+      roundCount,
+      llmProvider,
+      startedAt: new Date(),
+    })
+    .returning({ id: simulations.id });
+
+  const simulationId = simulation.id;
+  log.info({ simulationId, scenarioId }, 'Simulation record created');
+
+  const mirofishClient = new MirofishClient(
+    env.MIROFISH_API_URL ?? 'http://localhost:5000',
+  );
+
+  const config: MirofishConfig = { agentCount, roundCount, llmProvider };
+
+  try {
+    // ── Step 4: Graph Build Phase ─────────────────────────────────────
+
+    await updateSimulationStatus(simulationId, SIMULATION_STATUS.GRAPH_BUILDING);
+
+    const simPackage = toSimPackage(scenario);
+    const seedDoc = generateSeedDocument(simPackage);
+    const seedMarkdown = seedDoc.markdown;
+
+    // Store seed document
+    await updateSimulationStatus(simulationId, SIMULATION_STATUS.GRAPH_BUILDING, {
+      seedDocument: seedMarkdown,
+    });
+
+    const { project_id: mirofishProjectId } = await mirofishClient.generateOntology(
+      seedMarkdown,
+      scenario.simulationRequirement,
+      `sim-${simulationId}`,
+    );
+
+    // Store MiroFish project ID
+    await updateSimulationStatus(simulationId, SIMULATION_STATUS.GRAPH_BUILDING, {
+      mirofishProjectId,
+    });
+
+    await mirofishClient.pollOntologyStatus(mirofishProjectId, ONTOLOGY_TIMEOUT_MS);
+    await mirofishClient.buildGraph(mirofishProjectId);
+
+    log.info({ simulationId, mirofishProjectId }, 'Graph build phase complete');
+
+    // ── Step 5: Simulation Phase ────────────────────────────────────
+
+    await updateSimulationStatus(simulationId, SIMULATION_STATUS.SIMULATING);
+
+    const { simulation_id: mirofishSimId } = await mirofishClient.startSimulation(
+      mirofishProjectId,
+      config,
+    );
+
+    await mirofishClient.pollSimulationStatus(mirofishSimId, SIMULATION_TIMEOUT_MS);
+
+    log.info({ simulationId, mirofishSimId }, 'Simulation phase complete');
+
+    // ── Step 6: Report Phase ────────────────────────────────────────
+
+    await updateSimulationStatus(simulationId, SIMULATION_STATUS.REPORTING);
+
+    const { report } = await mirofishClient.getReport(mirofishProjectId);
+
+    // Parse predictions from the report text
+    const extractedPredictions = parsePredictions(report);
+
+    // Store report and mark complete
+    await updateSimulationStatus(simulationId, SIMULATION_STATUS.COMPLETED, {
+      report,
+      completedAt: new Date(),
+    });
+
+    log.info(
+      { simulationId, predictionCount: extractedPredictions.length },
+      'Simulation pipeline completed successfully',
+    );
+
+    return simulationId;
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    log.error({ simulationId, error: errorMessage }, 'Simulation pipeline failed');
+
+    await failSimulation(simulationId, errorMessage);
+    throw err;
+  }
+}
