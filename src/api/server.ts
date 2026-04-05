@@ -5,7 +5,9 @@ import { registerAuthDecorator } from './middleware/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { tenantRoutes } from './routes/tenants.js';
 import { simulationRoutes } from './routes/simulations.js';
+import { simulationActionRoutes } from './routes/simulation-actions.js';
 import { scenarioRoutes } from './routes/scenarios.js';
+import { predictionRoutes } from './routes/predictions.js';
 
 /**
  * Build and configure the Fastify application instance.
@@ -24,10 +26,15 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
   registerAuthDecorator(app);
 
   // --- Routes ---
+  // Note: register simulationActionRoutes BEFORE simulationRoutes so the
+  // literal sub-paths (`/:id/report`, `/:id/cancel`) are matched before
+  // the generic `/:id` handler.
   app.register(healthRoutes);
   app.register(tenantRoutes);
+  app.register(simulationActionRoutes);
   app.register(simulationRoutes);
   app.register(scenarioRoutes);
+  app.register(predictionRoutes);
 
   return app;
 }

@@ -17,7 +17,7 @@ import { eq, and } from 'drizzle-orm';
 
 import { SIMULATION_STATUS } from '../config/constants.js';
 import { env } from '../config/env.js';
-import { simulations, scenarios } from '../db/schema/tables.js';
+import { simulations, scenarios, predictions } from '../db/schema/tables.js';
 import { ConflictError, NotFoundError } from '../shared/errors.js';
 import { db } from '../shared/db.js';
 import { createChildLogger } from '../shared/logger.js';
@@ -25,7 +25,7 @@ import { generateSeedDocument } from '../transformer/seed-document.js';
 import type { SimPackage } from '../worldmonitor/types.js';
 
 import { MirofishClient } from './client.js';
-import { parsePredictions } from './prediction-parser.js';
+import { parsePredictions, type ParsedPrediction } from './prediction-parser.js';
 
 import type { MirofishConfig } from './types.js';
 
@@ -89,6 +89,32 @@ async function failSimulation(
     errorMessage,
     completedAt: new Date(),
   });
+}
+
+/**
+ * Insert parsed predictions into the `predictions` table, scoped to the
+ * owning tenant and simulation. The Drizzle schema declares `confidence`
+ * as a decimal column, which maps to a string on insert.
+ */
+async function insertPredictions(
+  simulationId: string,
+  tenantId: string,
+  parsed: ParsedPrediction[],
+): Promise<void> {
+  const rows = parsed.map((p) => ({
+    tenantId,
+    simulationId,
+    theater: p.theater,
+    predictionType: p.predictionType,
+    summary: p.summary,
+    confidence: p.confidence.toFixed(4),
+    timeHorizon: p.timeHorizon,
+    supportingFactions: p.supportingFactions,
+    dissentingFactions: p.dissentingFactions,
+  }));
+
+  await db.insert(predictions).values(rows);
+  log.info({ simulationId, count: rows.length }, 'Persisted predictions');
 }
 
 // ── Public API ──────────────────────────────────────────────────────
@@ -214,6 +240,11 @@ export async function runSimulation(
 
     // Parse predictions from the report text
     const extractedPredictions = parsePredictions(report);
+
+    // Persist parsed predictions — tenant-scoped via simulation
+    if (extractedPredictions.length > 0) {
+      await insertPredictions(simulationId, tenantId, extractedPredictions);
+    }
 
     // Store report and mark complete
     await updateSimulationStatus(simulationId, SIMULATION_STATUS.COMPLETED, {

@@ -4,20 +4,24 @@
  * Protected endpoints for triggering and listing simulations.
  * All routes require X-API-Key authentication via authGuard.
  *
- * POST /api/simulations  — trigger a simulation from a scenario
- * GET  /api/simulations  — list simulations with cursor pagination + status filter
+ * POST /api/simulations      — trigger a simulation from a scenario
+ * GET  /api/simulations      — list simulations with cursor pagination + status filter
+ * GET  /api/simulations/:id  — simulation detail
+ *
+ * Sub-resource routes (`:id/report`, `:id/cancel`) live in
+ * `simulation-actions.ts` to keep this file under the 300-line limit.
  */
 
 import { z } from 'zod';
-import { eq, and, lt, desc } from 'drizzle-orm';
+import { and, desc, eq, lt } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 
 import { db } from '../../shared/db.js';
 import { simulationQueue } from '../../shared/queue.js';
-import { ValidationError, NotFoundError } from '../../shared/errors.js';
+import { NotFoundError, ValidationError } from '../../shared/errors.js';
 import { paginationSchema, uuidSchema } from '../../shared/validation.js';
-import { scenarios, simulations, predictions } from '../../db/schema/tables.js';
-import { SIMULATION_STATUS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../config/constants.js';
+import { scenarios, simulations } from '../../db/schema/tables.js';
+import { SIMULATION_STATUS } from '../../config/constants.js';
 import { env } from '../../config/env.js';
 import { authGuard, type RequestTenant } from '../middleware/auth.js';
 
@@ -125,7 +129,6 @@ export async function simulationRoutes(app: FastifyInstance): Promise<void> {
 
       const { cursor, limit, status } = parsed.data;
 
-      // Build WHERE conditions
       const conditions = [eq(simulations.tenantId, tenant.id)];
 
       if (status) {
@@ -133,7 +136,6 @@ export async function simulationRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (cursor) {
-        // Look up the cursor simulation to get its createdAt for ordering
         const [cursorRow] = await db
           .select({ createdAt: simulations.createdAt })
           .from(simulations)
@@ -168,74 +170,6 @@ export async function simulationRoutes(app: FastifyInstance): Promise<void> {
       const nextCursor = hasMore ? data[data.length - 1].id : null;
 
       return reply.send({ data, nextCursor });
-    },
-  );
-
-  // ── GET /api/simulations/:id/report ─────────────────────────────────
-  // Registered BEFORE /:id so Fastify matches the longer path first.
-  app.get<{ Params: { id: string } }>(
-    '/api/simulations/:id/report',
-    { preHandler: [authGuard] },
-    async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
-
-      const idParse = uuidSchema.safeParse(request.params.id);
-      if (!idParse.success) {
-        throw new ValidationError('Invalid simulation id');
-      }
-      const id = idParse.data;
-
-      // Look up simulation scoped to tenant
-      const [simulation] = await db
-        .select({
-          id: simulations.id,
-          status: simulations.status,
-          report: simulations.report,
-        })
-        .from(simulations)
-        .where(
-          and(
-            eq(simulations.id, id),
-            eq(simulations.tenantId, tenant.id),
-          ),
-        );
-
-      if (!simulation) {
-        throw new NotFoundError(`Simulation not found: ${id}`);
-      }
-
-      // Report is only available once the simulation has completed
-      if (simulation.status !== SIMULATION_STATUS.COMPLETED) {
-        throw new NotFoundError(
-          `Report not available: simulation ${id} has status '${simulation.status}'`,
-        );
-      }
-
-      // Fetch predictions tied to this simulation (tenant-scoped)
-      const sigPredictions = await db
-        .select({
-          id: predictions.id,
-          theater: predictions.theater,
-          predictionType: predictions.predictionType,
-          summary: predictions.summary,
-          confidence: predictions.confidence,
-          timeHorizon: predictions.timeHorizon,
-          supportingFactions: predictions.supportingFactions,
-          dissentingFactions: predictions.dissentingFactions,
-          createdAt: predictions.createdAt,
-        })
-        .from(predictions)
-        .where(
-          and(
-            eq(predictions.simulationId, id),
-            eq(predictions.tenantId, tenant.id),
-          ),
-        );
-
-      return reply.send({
-        report: simulation.report ?? '',
-        predictions: sigPredictions,
-      });
     },
   );
 

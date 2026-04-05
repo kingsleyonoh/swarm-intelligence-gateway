@@ -753,3 +753,4 @@ describe('GET /api/simulations/:id/report', () => {
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 });
+
