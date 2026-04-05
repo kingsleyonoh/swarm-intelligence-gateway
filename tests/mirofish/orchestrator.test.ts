@@ -446,4 +446,45 @@ describe('runSimulation', () => {
       ).rejects.toThrow(/not found/i);
     });
   });
+
+  // ── Failure path preserves original error ────────────────────────
+
+  describe('catch block resilience', () => {
+    it('should propagate the original pipeline error even if failSimulation DB write fails', async () => {
+      // Pipeline error — MiroFish 500 on the very first call
+      mocks.generateOntology.mockRejectedValue(
+        new Error('MiroFish API error: 500 — engine down'),
+      );
+
+      // In-try updates succeed; failSimulation (the LAST update call)
+      // rejects to simulate a DB outage during cleanup. Before
+      // generateOntology throws, the orchestrator already issued:
+      //   1) updateSimulationStatus(GRAPH_BUILDING)
+      //   2) updateSimulationStatus(GRAPH_BUILDING, { seedDocument })
+      // then generateOntology rejects, then
+      //   3) failSimulation(...)  ← this one must fail in the test
+      let updateCallCount = 0;
+      mocks.dbUpdate.mockImplementation(() => ({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockImplementation(() => {
+            updateCallCount++;
+            // Fail only the failSimulation write (3rd and later calls)
+            if (updateCallCount >= 3) {
+              return Promise.reject(new Error('DB connection lost'));
+            }
+            return Promise.resolve([{ id: 'sim-001' }]);
+          }),
+        }),
+      }));
+
+      // The orchestrator must re-throw the ORIGINAL error, not the
+      // masking DB error from failSimulation.
+      await expect(
+        runSimulation({
+          scenarioId: 'scenario-001',
+          tenantId: 'tenant-001',
+        }),
+      ).rejects.toThrow(/MiroFish API error.*500/);
+    });
+  });
 });

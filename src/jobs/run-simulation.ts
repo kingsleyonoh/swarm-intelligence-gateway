@@ -42,8 +42,41 @@ export function createSimulationWorker(): Worker {
     },
   );
 
+  // Per-job failure handler — BullMQ fires this on every failed attempt,
+  // including intermediate retries. When `attemptsMade` equals the configured
+  // `attempts` the job is permanently dead-lettered and we escalate to ERROR
+  // with `permanentFailure=true` so downstream alerting can pick it up.
   worker.on('failed', (job, err) => {
-    log.error({ jobId: job?.id, error: err.message }, 'Simulation job failed');
+    const attemptsMade = job?.attemptsMade ?? 0;
+    const attemptsTotal = job?.opts?.attempts ?? 1;
+    const permanentFailure = attemptsMade >= attemptsTotal;
+
+    const context = {
+      jobId: job?.id,
+      queue: QUEUE_NAMES.RUN_SIMULATION,
+      scenarioId: job?.data?.scenarioId,
+      tenantId: job?.data?.tenantId,
+      attemptsMade,
+      attemptsTotal,
+      permanentFailure,
+      error: err.message,
+    };
+
+    if (permanentFailure) {
+      log.error(
+        context,
+        'Simulation job permanently failed after all retries (dead letter)',
+      );
+    } else {
+      log.warn(context, 'Simulation job attempt failed — will retry');
+    }
+  });
+
+  // Worker-level errors (Redis disconnect, processor crashes outside a job
+  // context) are surfaced here. Without this handler BullMQ swallows them
+  // and we have no visibility into worker health.
+  worker.on('error', (err) => {
+    log.error({ error: err.message }, 'Simulation worker encountered an error');
   });
 
   return worker;

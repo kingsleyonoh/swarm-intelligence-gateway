@@ -163,4 +163,26 @@ describe('GET /api/predictions/latest', () => {
     });
     expect(res.statusCode).toBe(401);
   });
+
+  // ── Lock-in: query param validation ─────────────────────────────
+
+  it('returns 400 with VALIDATION_ERROR for out-of-range minConfidence', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/predictions/latest?minConfidence=5',
+      headers: { 'x-api-key': testTenant.apiKey },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 400 with VALIDATION_ERROR for negative limit', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/predictions/latest?limit=-1',
+      headers: { 'x-api-key': testTenant.apiKey },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('VALIDATION_ERROR');
+  });
 });

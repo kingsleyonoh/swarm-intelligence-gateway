@@ -143,7 +143,10 @@ export async function pollWorldMonitor(tenantId: string): Promise<PollResult> {
 
     return { ingested: true, scenarioId };
   } catch (err) {
-    log.warn({ err }, 'WorldMonitor poll failed, will retry next cycle');
+    log.warn(
+      { err, tenantId, error: (err as Error).message },
+      'WorldMonitor poll failed, will retry next cycle',
+    );
     return { ingested: false };
   } finally {
     // Always clean up the WorldMonitor Redis connection

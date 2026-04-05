@@ -6,8 +6,10 @@ const mocks = vi.hoisted(() => {
   const runSimulation = vi.fn();
   const workerOn = vi.fn();
   const workerClose = vi.fn();
+  const loggerError = vi.fn();
+  const loggerWarn = vi.fn();
 
-  return { runSimulation, workerOn, workerClose };
+  return { runSimulation, workerOn, workerClose, loggerError, loggerWarn };
 });
 
 // Mock BullMQ Worker — must be a class since source calls `new Worker()`
@@ -28,10 +30,15 @@ vi.mock('../../src/mirofish/orchestrator.js', () => ({
   runSimulation: mocks.runSimulation,
 }));
 
-// Mock logger
+// Mock logger — preserve spies on error/warn so we can assert dead-letter
+// escalation and retry paths use the right log levels with full context.
 vi.mock('../../src/shared/logger.js', () => {
-  const noop = vi.fn();
-  const childLogger = { info: noop, warn: noop, error: noop, debug: noop };
+  const childLogger = {
+    info: vi.fn(),
+    warn: mocks.loggerWarn,
+    error: mocks.loggerError,
+    debug: vi.fn(),
+  };
   return {
     logger: { ...childLogger, child: vi.fn().mockReturnValue(childLogger) },
     createChildLogger: vi.fn().mockReturnValue(childLogger),
@@ -138,5 +145,73 @@ describe('createSimulationWorker', () => {
     expect(worker).toBeDefined();
     expect(worker).toHaveProperty('on');
     expect(worker).toHaveProperty('close');
+  });
+
+  // ── Dead letter / retry classification ─────────────────────────────
+
+  it('should register an error event handler for worker-level failures', () => {
+    createSimulationWorker();
+
+    expect(mocks.workerOn).toHaveBeenCalledWith('error', expect.any(Function));
+  });
+
+  it('should log non-final attempt as warn (will retry)', () => {
+    createSimulationWorker();
+
+    // Find the registered "failed" handler and invoke it directly
+    const failedCall = mocks.workerOn.mock.calls.find((c) => c[0] === 'failed');
+    expect(failedCall).toBeDefined();
+    const failedHandler = failedCall![1] as (job: unknown, err: Error) => void;
+
+    const fakeJob = {
+      id: 'job-retry',
+      attemptsMade: 1,
+      opts: { attempts: 3 },
+      data: { scenarioId: 'scenario-xyz', tenantId: 'tenant-xyz' },
+    };
+
+    failedHandler(fakeJob, new Error('Transient MiroFish error'));
+
+    expect(mocks.loggerWarn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: 'job-retry',
+        scenarioId: 'scenario-xyz',
+        tenantId: 'tenant-xyz',
+        attemptsMade: 1,
+        attemptsTotal: 3,
+        permanentFailure: false,
+        error: 'Transient MiroFish error',
+      }),
+      expect.stringMatching(/attempt failed|will retry/i),
+    );
+  });
+
+  it('should log final attempt as error with permanentFailure flag (dead letter)', () => {
+    createSimulationWorker();
+
+    const failedCall = mocks.workerOn.mock.calls.find((c) => c[0] === 'failed');
+    const failedHandler = failedCall![1] as (job: unknown, err: Error) => void;
+
+    const fakeJob = {
+      id: 'job-dead',
+      attemptsMade: 3,
+      opts: { attempts: 3 },
+      data: { scenarioId: 'scenario-abc', tenantId: 'tenant-abc' },
+    };
+
+    failedHandler(fakeJob, new Error('Pipeline exhausted retries'));
+
+    expect(mocks.loggerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: 'job-dead',
+        scenarioId: 'scenario-abc',
+        tenantId: 'tenant-abc',
+        attemptsMade: 3,
+        attemptsTotal: 3,
+        permanentFailure: true,
+        error: 'Pipeline exhausted retries',
+      }),
+      expect.stringMatching(/permanently failed|dead letter/i),
+    );
   });
 });

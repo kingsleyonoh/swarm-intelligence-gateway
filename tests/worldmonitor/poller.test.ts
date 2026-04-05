@@ -91,10 +91,16 @@ vi.mock('../../src/shared/queue.js', () => ({
   },
 }));
 
-// Mock logger to prevent output during tests
+// Mock logger to prevent output during tests, but preserve spies so we can
+// assert that structured context is passed through on warn / error paths.
+const loggerMocks = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
 vi.mock('../../src/shared/logger.js', () => {
-  const noop = vi.fn();
-  const childLogger = { info: noop, warn: noop, error: noop, debug: noop };
+  const childLogger = loggerMocks;
   return {
     logger: { ...childLogger, child: vi.fn().mockReturnValue(childLogger) },
     createChildLogger: vi.fn().mockReturnValue(childLogger),
@@ -279,5 +285,35 @@ describe('pollWorldMonitor', () => {
     const result = await pollWorldMonitor(tenantId);
 
     expect(result.ingested).toBe(false);
+  });
+
+  // ── Structured error logging ──────────────────────────────────────
+
+  it('should log tenantId and error message when poll fails unexpectedly', async () => {
+    // Trigger an unexpected error inside the try block by making
+    // the DB select reject (not a Redis connection failure).
+    mocks.redisGet.mockResolvedValue(JSON.stringify(validSimPackageJson()));
+    mocks.dbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockRejectedValue(new Error('DB unreachable')),
+      }),
+    });
+
+    const result = await pollWorldMonitor(tenantId);
+
+    expect(result.ingested).toBe(false);
+
+    // Top-level catch must include tenantId + error message for
+    // multi-tenant debugging.
+    const warnCalls = loggerMocks.warn.mock.calls;
+    const topLevelCatchCall = warnCalls.find(
+      (call) =>
+        typeof call[1] === 'string' && call[1].includes('WorldMonitor poll failed'),
+    );
+    expect(topLevelCatchCall).toBeDefined();
+    expect(topLevelCatchCall![0]).toMatchObject({
+      tenantId,
+      error: 'DB unreachable',
+    });
   });
 });

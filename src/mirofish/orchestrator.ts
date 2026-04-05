@@ -275,9 +275,25 @@ export async function runSimulation(
     return simulationId;
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    log.error({ simulationId, error: errorMessage }, 'Simulation pipeline failed');
+    log.error({ simulationId, tenantId, error: errorMessage }, 'Simulation pipeline failed');
 
-    await failSimulation(simulationId, errorMessage);
+    // Mark simulation failed — but never let a DB write failure mask the
+    // original pipeline error. If failSimulation itself throws, log the
+    // secondary error and still re-throw the original.
+    try {
+      await failSimulation(simulationId, errorMessage);
+    } catch (failErr) {
+      log.error(
+        {
+          simulationId,
+          tenantId,
+          originalError: errorMessage,
+          failUpdateError: (failErr as Error).message,
+        },
+        'Failed to persist failed simulation status — original error preserved',
+      );
+    }
+
     throw err;
   }
 }
