@@ -16,6 +16,7 @@ import {
   simulations,
   predictions,
 } from '../../src/db/schema/tables.js';
+import { invalidatePattern } from '../../src/shared/cache.js';
 import {
   createPredScenario,
   createPredSimulation,
@@ -53,6 +54,9 @@ describe('GET /api/predictions/latest', () => {
       await db.delete(scenarios).where(eq(scenarios.id, id));
     }
     scenarioIds.length = 0;
+
+    // Clear cached prediction responses for this tenant between tests.
+    await invalidatePattern(`predictions:*:${testTenant.id}:*`);
   });
 
   afterAll(async () => {

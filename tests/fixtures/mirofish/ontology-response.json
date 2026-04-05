@@ -1,0 +1,6 @@
+{
+  "project_id": "proj-2026-04-05-001",
+  "status": "complete",
+  "entity_types": ["StateActor", "MilitaryUnit", "EconomicBloc"],
+  "edge_types": ["OPPOSES", "ALLIED_WITH", "TRADES_WITH"]
+}

@@ -17,6 +17,7 @@ import {
   predictions,
 } from '../../src/db/schema/tables.js';
 import { PREDICTION_TYPE } from '../../src/config/constants.js';
+import { invalidatePattern } from '../../src/shared/cache.js';
 import {
   createPredScenario,
   createPredSimulation,
@@ -56,6 +57,10 @@ describe('GET /api/predictions', () => {
       await db.delete(scenarios).where(eq(scenarios.id, id));
     }
     scenarioIds.length = 0;
+
+    // Clear cache entries for this tenant so the next test sees fresh data.
+    await invalidatePattern(`predictions:*:${testTenant.id}:*`);
+    await invalidatePattern(`predictions:*:${otherTenant.id}:*`);
   });
 
   afterAll(async () => {

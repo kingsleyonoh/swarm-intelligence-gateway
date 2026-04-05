@@ -1,0 +1,5 @@
+{
+  "runId": "wm-malformed",
+  "title": "Missing Required Fields Package",
+  "selectedTheaters": "this should be an array not a string"
+}

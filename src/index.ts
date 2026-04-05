@@ -31,6 +31,7 @@ import { closeRedis } from './shared/redis.js';
 import { simulationQueue } from './shared/queue.js';
 import { createSimulationWorker } from './jobs/run-simulation.js';
 import { startPollerCron } from './jobs/poll-worldmonitor.js';
+import { startCleanupCron } from './jobs/cleanup.js';
 import { tenants } from './db/schema.js';
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ import { tenants } from './db/schema.js';
 export interface ShutdownResources {
   app?: { close: () => Promise<unknown> };
   cronTask?: { stop: () => void };
+  cleanupCronTask?: { stop: () => void };
   worker?: { close: () => Promise<unknown> };
   queue?: { close: () => Promise<unknown> };
   closeRedis?: () => Promise<unknown>;
@@ -91,7 +93,12 @@ export function createShutdownHandler(resources: ShutdownResources) {
 
       if (resources.cronTask) {
         resources.cronTask.stop();
-        logger.info('Cron stopped');
+        logger.info('Poller cron stopped');
+      }
+
+      if (resources.cleanupCronTask) {
+        resources.cleanupCronTask.stop();
+        logger.info('Cleanup cron stopped');
       }
 
       if (resources.worker) {
@@ -169,17 +176,25 @@ export async function main(): Promise<void> {
     );
   }
 
-  // 4. Build shutdown handler with all active resources
+  // 4. Start cleanup cron (runs daily at 03:00 UTC regardless of tenant)
+  const cleanupCronTask = startCleanupCron();
+  logger.info(
+    { retentionDays: env.DATA_RETENTION_DAYS },
+    'Cleanup cron started',
+  );
+
+  // 5. Build shutdown handler with all active resources
   const shutdown = createShutdownHandler({
     app,
     cronTask,
+    cleanupCronTask,
     worker,
     queue: simulationQueue,
     closeRedis,
     closeDb,
   });
 
-  // 5. Register signal handlers BEFORE starting the listener so we
+  // 6. Register signal handlers BEFORE starting the listener so we
   //    can't race a SIGTERM that arrives during app.listen().
   process.on('SIGTERM', () => {
     void shutdown('SIGTERM');
@@ -199,7 +214,7 @@ export async function main(): Promise<void> {
     void shutdown('unhandledRejection');
   });
 
-  // 6. Start Fastify server
+  // 7. Start Fastify server
   try {
     await app.listen({ port: env.PORT, host: '0.0.0.0' });
     logger.info({ port: env.PORT }, 'Server listening');

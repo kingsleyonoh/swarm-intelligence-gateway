@@ -20,6 +20,7 @@ import { env } from '../config/env.js';
 import { simulations, scenarios, predictions } from '../db/schema/tables.js';
 import { ConflictError, NotFoundError } from '../shared/errors.js';
 import { db } from '../shared/db.js';
+import { invalidatePattern } from '../shared/cache.js';
 import { createChildLogger } from '../shared/logger.js';
 import { generateSeedDocument } from '../transformer/seed-document.js';
 import type { SimPackage } from '../worldmonitor/types.js';
@@ -95,6 +96,10 @@ async function failSimulation(
  * Insert parsed predictions into the `predictions` table, scoped to the
  * owning tenant and simulation. The Drizzle schema declares `confidence`
  * as a decimal column, which maps to a string on insert.
+ *
+ * After a successful insert, the tenant's prediction cache is invalidated
+ * so subsequent queries see the new rows. Cache invalidation failures are
+ * logged but do NOT break the pipeline (5-minute TTL is the safety net).
  */
 async function insertPredictions(
   simulationId: string,
@@ -115,6 +120,16 @@ async function insertPredictions(
 
   await db.insert(predictions).values(rows);
   log.info({ simulationId, count: rows.length }, 'Persisted predictions');
+
+  try {
+    const deleted = await invalidatePattern(`predictions:*:${tenantId}:*`);
+    log.debug({ tenantId, deleted }, 'Prediction cache invalidated');
+  } catch (err) {
+    log.warn(
+      { tenantId, error: (err as Error).message },
+      'Failed to invalidate prediction cache — will expire naturally',
+    );
+  }
 }
 
 // ── Public API ──────────────────────────────────────────────────────

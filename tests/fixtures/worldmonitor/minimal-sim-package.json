@@ -1,0 +1,36 @@
+{
+  "runId": "wm-2026-04-05-minimal",
+  "timestamp": "2026-04-05T00:00:00Z",
+  "title": "Minimal Test Package",
+  "selectedTheaters": [
+    {
+      "label": "Test Theater",
+      "region": "Test Region",
+      "stateKind": "neutral",
+      "rankingScore": 0.5
+    }
+  ],
+  "entities": [
+    {
+      "name": "Test Entity",
+      "class": "state_actor",
+      "stance": "neutral",
+      "objectives": [],
+      "constraints": [],
+      "relationships": []
+    }
+  ],
+  "eventSeeds": [
+    {
+      "type": "test_event",
+      "summary": "Minimal event seed",
+      "timing": "immediate",
+      "strength": 0.5
+    }
+  ],
+  "constraints": {
+    "hard": [],
+    "soft": []
+  },
+  "simulationRequirement": "Minimal scenario for fixture testing."
+}

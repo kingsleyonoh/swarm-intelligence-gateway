@@ -1,0 +1,8 @@
+{
+  "simulation_id": "sim-2026-04-05-001",
+  "status": "complete",
+  "progress": 1.0,
+  "current_round": 5,
+  "total_rounds": 5,
+  "agent_count": 4096
+}

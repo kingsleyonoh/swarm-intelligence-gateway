@@ -1,0 +1,76 @@
+{
+  "runId": "wm-2026-04-05-001",
+  "timestamp": "2026-04-05T12:00:00Z",
+  "title": "Middle East Tensions Escalation Analysis",
+  "selectedTheaters": [
+    {
+      "label": "Persian Gulf Shipping Routes",
+      "region": "Middle East",
+      "route": "Strait of Hormuz",
+      "commodity": "Crude Oil",
+      "stateKind": "conflict",
+      "rankingScore": 0.92
+    },
+    {
+      "label": "Eastern Mediterranean",
+      "region": "Levant",
+      "route": "Suez Approaches",
+      "commodity": "LNG",
+      "stateKind": "tension",
+      "rankingScore": 0.78
+    }
+  ],
+  "entities": [
+    {
+      "name": "Iran Revolutionary Guard",
+      "class": "state_actor",
+      "stance": "aggressive",
+      "objectives": ["Regional dominance", "Sanctions evasion"],
+      "constraints": ["International pressure", "Economic weakness"],
+      "relationships": [
+        { "target": "US Navy", "type": "OPPOSES" },
+        { "target": "Hezbollah", "type": "ALLIED_WITH" }
+      ]
+    },
+    {
+      "name": "US Fifth Fleet",
+      "class": "military_unit",
+      "stance": "deterrent",
+      "objectives": ["Freedom of navigation", "Allied protection"],
+      "constraints": ["Rules of engagement", "Political oversight"],
+      "relationships": [
+        { "target": "Iran Revolutionary Guard", "type": "OPPOSES" },
+        { "target": "Saudi Navy", "type": "ALLIED_WITH" }
+      ]
+    },
+    {
+      "name": "OPEC+",
+      "class": "economic_bloc",
+      "stance": "neutral",
+      "objectives": ["Price stability", "Production coordination"],
+      "constraints": ["Member disagreements"],
+      "relationships": [
+        { "target": "Iran Revolutionary Guard", "type": "TRADES_WITH" }
+      ]
+    }
+  ],
+  "eventSeeds": [
+    {
+      "type": "military_action",
+      "summary": "Naval confrontation in Strait of Hormuz",
+      "timing": "imminent",
+      "strength": 0.85
+    },
+    {
+      "type": "market_reaction",
+      "summary": "Oil futures spike on tanker detention reports",
+      "timing": "immediate",
+      "strength": 0.72
+    }
+  ],
+  "constraints": {
+    "hard": ["No direct US-Iran military conflict", "No nuclear escalation"],
+    "soft": ["Oil price impact limited to 20%", "Avoid civilian casualties"]
+  },
+  "simulationRequirement": "Analyze the cascading effects of a potential naval confrontation in the Strait of Hormuz, including market reactions, diplomatic responses, and regional power realignments over a 72-hour window."
+}
