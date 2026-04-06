@@ -21,6 +21,10 @@ import { VariantLoader } from './core/variant-loader.js';
 import { swarmVariant } from './config/variants/swarm.js';
 import { SwarmTheaterPanel } from './components/SwarmTheaterPanel.js';
 import { FactionMapPanel } from './components/FactionMapPanel.js';
+import { PredictionTimelinePanel } from './components/PredictionTimelinePanel.js';
+import { ConsensusHeatmapPanel } from './components/ConsensusHeatmapPanel.js';
+import { DataBridge } from './api/data-bridge.js';
+import type { Panel } from './types.js';
 
 // Phase 1: Initialize registries
 const panelRegistry = new PanelRegistry();
@@ -30,6 +34,8 @@ const variantLoader = new VariantLoader(panelRegistry, layerRegistry);
 // Phase 2: Register panels and layers
 panelRegistry.register('swarm-theater', SwarmTheaterPanel);
 panelRegistry.register('faction-map', FactionMapPanel);
+panelRegistry.register('prediction-timeline', PredictionTimelinePanel);
+panelRegistry.register('consensus-heatmap', ConsensusHeatmapPanel);
 
 // Phase 3-4: Load variant config and resolve
 const { panels, layers } = variantLoader.load(swarmVariant);
@@ -55,7 +61,22 @@ if (panelContainer) {
   }
 }
 
-// Phase 6-7: Globe and polling loops will be wired in later batches
+// Phase 6: Globe initialization will be wired in later batches
+
+// Phase 7: Start polling loops via DataBridge
+const mountedPanels = new Map<string, Panel>();
+for (const panel of panels) {
+  mountedPanels.set(panel.id, panel);
+}
+
+const dataBridge = new DataBridge({
+  apiBaseUrl: swarmVariant.apiBaseUrl || window.location.origin,
+  apiKey: '', // Set via config or env in production
+  refreshIntervals: swarmVariant.refreshIntervals,
+  panels: mountedPanels,
+});
+
+dataBridge.startAll();
 
 // Phase 8: Ready
 console.info(
@@ -64,4 +85,4 @@ console.info(
 );
 
 // Export for testing/debugging
-export { panelRegistry, layerRegistry, variantLoader };
+export { panelRegistry, layerRegistry, variantLoader, dataBridge };
