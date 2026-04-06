@@ -1,0 +1,103 @@
+{
+  "report": "## Swarm Intelligence Simulation Report — Multi-Theater Analysis\n\n### Executive Summary\nA swarm of 4,096 heterogeneous agents completed 5 simulation rounds across five theaters: Middle East, Eastern Europe, South China Sea, West Africa, and Central Asia. The simulation identified converging escalation patterns in the South China Sea and Middle East theaters, with moderate de-escalation signals in Eastern Europe driven by diplomatic faction consensus.\n\n### Key Findings\n1. **South China Sea** — Highest escalation confidence (0.91) driven by naval patrol frequency increases and nationalist rhetoric amplification. The PLA Navy faction dominated swarm consensus with 73% agent alignment.\n2. **Middle East** — Regional proxy mobilization produced strong escalation signals (0.87 confidence) with secondary market disruption predictions for energy sector volatility.\n3. **Eastern Europe** — Diplomatic back-channel activity generated de-escalation signals (0.78 confidence), though defense spending market shifts remain highly likely (0.82).\n4. **West Africa** — Resource competition driving market shift predictions (0.88 confidence) with secondary escalation risk from militia activity near mining operations.\n5. **Central Asia** — Water resource disputes emerging as potential flashpoint with moderate escalation confidence (0.63).\n\n### Methodology\nAgents were assigned faction-aligned personas based on entity analysis from WorldMonitor simulation packages. Each agent operated with bounded rationality and faction-specific utility functions over 5 rounds of interaction. Consensus was measured via embedding similarity clustering at round completion.\n\n### Confidence Distribution\n- High confidence (>0.8): 6 predictions\n- Medium confidence (0.5-0.8): 9 predictions\n- Low confidence (<0.5): 3 predictions\n\n### Recommendations\n- Priority monitoring: South China Sea naval movements (48h window)\n- Diplomatic opportunity: Eastern Europe ceasefire framework (14d window)\n- Market watch: West Africa critical minerals, Middle East energy futures\n- Information operations: Eastern Europe disinformation campaign detection before alliance summit",
+  "predictions": [
+    {
+      "id": "pred-demo-007",
+      "simulationId": "sim-demo-003",
+      "theater": "South China Sea",
+      "predictionType": "escalation",
+      "summary": "Naval patrols in disputed waters increasing frequency — risk of confrontation elevated",
+      "confidence": 0.91,
+      "timeHorizon": "48h",
+      "supportingFactions": ["PLA Navy Faction", "Nationalist Bloc"],
+      "dissentingFactions": ["Trade Partners", "MFA"],
+      "createdAt": "2026-04-03T14:58:00Z"
+    },
+    {
+      "id": "pred-demo-001",
+      "simulationId": "sim-demo-001",
+      "theater": "Middle East",
+      "predictionType": "escalation",
+      "summary": "Regional tensions likely to increase following proxy force mobilization along northern corridor",
+      "confidence": 0.87,
+      "timeHorizon": "72h",
+      "supportingFactions": ["Hawks", "Security Council"],
+      "dissentingFactions": ["Diplomatic Corps"],
+      "createdAt": "2026-04-01T08:45:00Z"
+    },
+    {
+      "id": "pred-demo-004",
+      "simulationId": "sim-demo-002",
+      "theater": "Eastern Europe",
+      "predictionType": "de_escalation",
+      "summary": "Diplomatic back-channel negotiations showing progress toward ceasefire framework",
+      "confidence": 0.78,
+      "timeHorizon": "14d",
+      "supportingFactions": ["Diplomatic Corps", "EU Mediators"],
+      "dissentingFactions": ["Hardliners", "Defense Hawks"],
+      "createdAt": "2026-04-02T10:52:00Z"
+    }
+  ],
+  "factions": [
+    {
+      "region": "Middle East",
+      "stance": "escalate",
+      "factionName": "Hawks Coalition",
+      "confidence": 0.87
+    },
+    {
+      "region": "Middle East",
+      "stance": "de_escalate",
+      "factionName": "Diplomatic Corps",
+      "confidence": 0.41
+    },
+    {
+      "region": "Eastern Europe",
+      "stance": "de_escalate",
+      "factionName": "EU Mediators",
+      "confidence": 0.78
+    },
+    {
+      "region": "Eastern Europe",
+      "stance": "uncertain",
+      "factionName": "Defense Hawks",
+      "confidence": 0.45
+    },
+    {
+      "region": "South China Sea",
+      "stance": "escalate",
+      "factionName": "PLA Navy Faction",
+      "confidence": 0.91
+    },
+    {
+      "region": "South China Sea",
+      "stance": "de_escalate",
+      "factionName": "ASEAN Mediators",
+      "confidence": 0.55
+    },
+    {
+      "region": "West Africa",
+      "stance": "escalate",
+      "factionName": "Resource Hawks",
+      "confidence": 0.68
+    },
+    {
+      "region": "West Africa",
+      "stance": "neutral",
+      "factionName": "Peacekeeping Bloc",
+      "confidence": 0.52
+    },
+    {
+      "region": "Central Asia",
+      "stance": "uncertain",
+      "factionName": "Water Security Unit",
+      "confidence": 0.63
+    },
+    {
+      "region": "Central Asia",
+      "stance": "neutral",
+      "factionName": "Diplomatic Channel",
+      "confidence": 0.58
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "data": [
+    {
+      "id": "sim-demo-001",
+      "tenantId": "demo-tenant",
+      "scenarioId": "scn-me-001",
+      "status": "completed",
+      "seedDocument": null,
+      "report": "Swarm simulation completed for Middle East theater. 4096 agents across 5 rounds produced converging predictions on regional escalation patterns.",
+      "costEstimateUsd": 0.42,
+      "createdAt": "2026-04-01T08:00:00Z",
+      "updatedAt": "2026-04-01T08:45:00Z"
+    },
+    {
+      "id": "sim-demo-002",
+      "tenantId": "demo-tenant",
+      "scenarioId": "scn-ee-001",
+      "status": "completed",
+      "seedDocument": null,
+      "report": "Eastern Europe theater analysis complete. Diplomatic corridor agents showed strong de-escalation consensus with moderate confidence.",
+      "costEstimateUsd": 0.38,
+      "createdAt": "2026-04-02T10:00:00Z",
+      "updatedAt": "2026-04-02T10:52:00Z"
+    },
+    {
+      "id": "sim-demo-003",
+      "tenantId": "demo-tenant",
+      "scenarioId": "scn-scs-001",
+      "status": "completed",
+      "seedDocument": null,
+      "report": "South China Sea simulation found bifurcated swarm consensus — naval faction escalation versus diplomatic faction de-escalation.",
+      "costEstimateUsd": 0.51,
+      "createdAt": "2026-04-03T14:00:00Z",
+      "updatedAt": "2026-04-03T14:58:00Z"
+    },
+    {
+      "id": "sim-demo-004",
+      "tenantId": "demo-tenant",
+      "scenarioId": "scn-wa-001",
+      "status": "completed",
+      "seedDocument": null,
+      "report": "West Africa resource competition simulation detected market shift signals with high agent consensus across economic factions.",
+      "costEstimateUsd": 0.35,
+      "createdAt": "2026-04-04T06:00:00Z",
+      "updatedAt": "2026-04-04T06:40:00Z"
+    }
+  ],
+  "nextCursor": null
+}

@@ -23,8 +23,12 @@ import { SwarmTheaterPanel } from './components/SwarmTheaterPanel.js';
 import { FactionMapPanel } from './components/FactionMapPanel.js';
 import { PredictionTimelinePanel } from './components/PredictionTimelinePanel.js';
 import { ConsensusHeatmapPanel } from './components/ConsensusHeatmapPanel.js';
+import { SwarmPredictionsLayer } from './layers/SwarmPredictionsLayer.js';
+import { FactionBoundariesLayer } from './layers/FactionBoundariesLayer.js';
+import { ConsensusHeatLayer } from './layers/ConsensusHeatLayer.js';
 import { DataBridge } from './api/data-bridge.js';
-import type { Panel } from './types.js';
+import { DemoApiClient } from './api/demo-client.js';
+import type { Panel, MapLayerConstructor } from './types.js';
 
 // Phase 1: Initialize registries
 const panelRegistry = new PanelRegistry();
@@ -36,6 +40,19 @@ panelRegistry.register('swarm-theater', SwarmTheaterPanel);
 panelRegistry.register('faction-map', FactionMapPanel);
 panelRegistry.register('prediction-timeline', PredictionTimelinePanel);
 panelRegistry.register('consensus-heatmap', ConsensusHeatmapPanel);
+
+layerRegistry.register(
+  'swarm-predictions',
+  SwarmPredictionsLayer as unknown as MapLayerConstructor,
+);
+layerRegistry.register(
+  'faction-boundaries',
+  FactionBoundariesLayer as unknown as MapLayerConstructor,
+);
+layerRegistry.register(
+  'consensus-heat',
+  ConsensusHeatLayer as unknown as MapLayerConstructor,
+);
 
 // Phase 3-4: Load variant config and resolve
 const { panels, layers } = variantLoader.load(swarmVariant);
@@ -69,6 +86,16 @@ for (const panel of panels) {
   mountedPanels.set(panel.id, panel);
 }
 
+// Detect demo mode from Vite env or absence of API key
+const isDemoMode =
+  (typeof import.meta !== 'undefined' &&
+    (import.meta as unknown as Record<string, Record<string, string>>).env
+      ?.VITE_DEMO_MODE === 'true') ||
+  false;
+
+// Create demo client for static-site deployment (no backend required)
+const demoClient = isDemoMode ? new DemoApiClient('/demo') : null;
+
 const dataBridge = new DataBridge({
   apiBaseUrl: swarmVariant.apiBaseUrl || window.location.origin,
   apiKey: '', // Set via config or env in production
@@ -76,7 +103,9 @@ const dataBridge = new DataBridge({
   panels: mountedPanels,
 });
 
-dataBridge.startAll();
+if (!isDemoMode) {
+  dataBridge.startAll();
+}
 
 // Phase 8: Ready
 console.info(
@@ -85,4 +114,11 @@ console.info(
 );
 
 // Export for testing/debugging
-export { panelRegistry, layerRegistry, variantLoader, dataBridge };
+export {
+  panelRegistry,
+  layerRegistry,
+  variantLoader,
+  dataBridge,
+  demoClient,
+  isDemoMode,
+};
