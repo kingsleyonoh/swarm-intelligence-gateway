@@ -328,6 +328,10 @@ body::after {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
 }
 
+.theater-card[hidden] {
+  display: none !important;
+}
+
 .theater-card:hover {
   border-color: var(--accent-dim);
   background: var(--bg-card-hover);
