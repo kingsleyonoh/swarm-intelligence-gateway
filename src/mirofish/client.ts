@@ -184,7 +184,64 @@ export class MirofishClient {
   }
 
   /**
-   * Start a previously created simulation.
+   * Prepare a simulation (generate profiles + config).
+   *
+   * `POST /api/simulation/prepare` — JSON `{ simulation_id }`.
+   * Async — poll via `POST /api/simulation/prepare/status`.
+   */
+  async prepareSimulation(
+    simulationId: string,
+  ): Promise<Record<string, unknown>> {
+    return this.requestWithRetry<Record<string, unknown>>(
+      `${this.baseUrl}/api/simulation/prepare`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ simulation_id: simulationId }),
+      },
+    );
+  }
+
+  /**
+   * Poll simulation preparation status until ready.
+   *
+   * `POST /api/simulation/prepare/status` — JSON `{ simulation_id }`.
+   */
+  async pollPrepareStatus(
+    simulationId: string,
+    timeoutMs: number = 600_000,
+  ): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const response = await this.requestWithRetry<Record<string, unknown>>(
+        `${this.baseUrl}/api/simulation/prepare/status`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ simulation_id: simulationId }),
+        },
+      );
+
+      const data = (response.data ?? response) as Record<string, unknown>;
+      const ready = data.all_ready === true || data.status === 'ready' || data.status === 'completed';
+
+      if (ready) {
+        log.info({ simulationId }, 'Simulation preparation complete');
+        return;
+      }
+
+      log.debug({ simulationId, data }, 'Simulation still preparing');
+      await sleep(this.ontologyPollIntervalMs);
+    }
+
+    throw new Error(
+      `Simulation preparation timed out after ${timeoutMs}ms`,
+    );
+  }
+
+  /**
+   * Start a previously created and prepared simulation.
    *
    * `POST /api/simulation/start` — JSON `{ simulation_id, ... }`.
    */

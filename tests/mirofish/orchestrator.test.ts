@@ -56,6 +56,8 @@ const mocks = vi.hoisted(() => {
   const pollTask = vi.fn();
   const buildGraph = vi.fn();
   const createSimulation = vi.fn();
+  const prepareSimulation = vi.fn();
+  const pollPrepareStatus = vi.fn();
   const startSimulation = vi.fn();
   const pollSimulationStatus = vi.fn();
   const getReport = vi.fn();
@@ -70,6 +72,8 @@ const mocks = vi.hoisted(() => {
     pollTask,
     buildGraph,
     createSimulation,
+    prepareSimulation,
+    pollPrepareStatus,
     startSimulation,
     pollSimulationStatus,
     getReport,
@@ -86,6 +90,8 @@ vi.mock('../../src/mirofish/client.js', () => ({
     pollTask = mocks.pollTask;
     buildGraph = mocks.buildGraph;
     createSimulation = mocks.createSimulation;
+    prepareSimulation = mocks.prepareSimulation;
+    pollPrepareStatus = mocks.pollPrepareStatus;
     startSimulation = mocks.startSimulation;
     pollSimulationStatus = mocks.pollSimulationStatus;
     getReport = mocks.getReport;
@@ -185,6 +191,8 @@ function setupSuccessfulMirofishMocks() {
   mocks.buildGraph.mockResolvedValue({ data: { task_id: 'build-task-001', project_id: 'mf-proj-001', message: 'ok' }, success: true });
   mocks.pollTask.mockResolvedValue(undefined);
   mocks.createSimulation.mockResolvedValue({ data: { simulation_id: 'mf-sim-001', status: 'created' }, success: true });
+  mocks.prepareSimulation.mockResolvedValue({ success: true });
+  mocks.pollPrepareStatus.mockResolvedValue(undefined);
   mocks.startSimulation.mockResolvedValue({ success: true });
   mocks.pollSimulationStatus.mockResolvedValue(undefined);
   mocks.getReport.mockResolvedValue({
