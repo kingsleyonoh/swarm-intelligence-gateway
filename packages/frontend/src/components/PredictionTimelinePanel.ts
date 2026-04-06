@@ -23,7 +23,7 @@ const CHART_HEIGHT = 400;
 const MARGIN = { top: 20, right: 20, bottom: 40, left: 50 };
 const PLOT_W = CHART_WIDTH - MARGIN.left - MARGIN.right;
 const PLOT_H = CHART_HEIGHT - MARGIN.top - MARGIN.bottom;
-const DOT_RADIUS = 5;
+const DOT_RADIUS = 6;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class PredictionTimelinePanel implements Panel {
@@ -126,8 +126,8 @@ export class PredictionTimelinePanel implements Panel {
       gridline.setAttribute('y1', String(y));
       gridline.setAttribute('x2', String(PLOT_W));
       gridline.setAttribute('y2', String(y));
-      gridline.setAttribute('stroke', '#1e1e35');
-      gridline.setAttribute('stroke-width', '1');
+      gridline.setAttribute('stroke', '#1c2030');
+      gridline.setAttribute('stroke-width', '0.5');
       this.plotGroup.appendChild(gridline);
 
       // Tick label
@@ -271,8 +271,8 @@ export class PredictionTimelinePanel implements Panel {
           'y2',
           String(this.scaleY(sorted[i + 1].confidence)),
         );
-        line.setAttribute('stroke', 'rgba(255,255,255,0.3)');
-        line.setAttribute('stroke-width', '1');
+        line.setAttribute('stroke', 'rgba(255,255,255,0.4)');
+        line.setAttribute('stroke-width', '1.5');
         this.plotGroup.appendChild(line);
       }
     }

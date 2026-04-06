@@ -33,7 +33,7 @@ const MIN_RADIUS = 14;
 const MAX_RADIUS = 45;
 const MIN_STROKE = 1;
 const MAX_STROKE = 4;
-const EDGE_COLOR = 'rgba(255,255,255,0.2)';
+const LABEL_INSIDE_THRESHOLD = 25;
 
 export class FactionMapPanel implements Panel {
   readonly id = 'faction-map';
@@ -152,7 +152,10 @@ export class FactionMapPanel implements Panel {
       line.setAttribute('y1', String(edge.source.y));
       line.setAttribute('x2', String(edge.target.x));
       line.setAttribute('y2', String(edge.target.y));
-      line.setAttribute('stroke', EDGE_COLOR);
+      // Derive edge color from source node stance for visibility
+      const stanceColor = STANCE_COLORS[edge.source.stance] ?? '#888';
+      line.setAttribute('stroke', stanceColor);
+      line.setAttribute('stroke-opacity', '0.3');
       line.setAttribute(
         'stroke-width',
         String(this.scaleStroke(edge.weight)),
@@ -203,10 +206,20 @@ export class FactionMapPanel implements Panel {
       const text = document.createElementNS(SVG_NS, 'text');
       text.setAttribute('class', 'faction-label');
       text.setAttribute('x', String(node.x));
-      text.setAttribute('y', String(node.y + r + 16));
       text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('fill', '#aaa');
-      text.setAttribute('font-size', '11');
+
+      if (r >= LABEL_INSIDE_THRESHOLD) {
+        // Large nodes: label inside the node
+        text.setAttribute('y', String(node.y + 4));
+        text.setAttribute('fill', '#fff');
+        text.setAttribute('font-size', '10');
+      } else {
+        // Small nodes: label below the node
+        text.setAttribute('y', String(node.y + r + 16));
+        text.setAttribute('fill', '#aaa');
+        text.setAttribute('font-size', '11');
+      }
+
       text.textContent = node.name;
       this.labelGroup.appendChild(text);
     }

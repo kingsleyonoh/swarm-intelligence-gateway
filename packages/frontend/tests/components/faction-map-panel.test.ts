@@ -135,12 +135,16 @@ describe('FactionMapPanel', () => {
       }
     });
 
-    it('edges have semi-transparent white color', () => {
+    it('edges are colored by source node stance', () => {
       panel.mount(container);
       panel.update(makeFactionData());
-      const edge = container.querySelector('.faction-edge');
-      const stroke = edge?.getAttribute('stroke');
-      expect(stroke).toContain('rgba(255');
+      const edges = container.querySelectorAll('.faction-edge');
+      // First edge: source is faction-1 (escalate → #e05252)
+      expect(edges[0]?.getAttribute('stroke')).toBe('#e05252');
+      expect(edges[0]?.getAttribute('stroke-opacity')).toBe('0.3');
+      // Second edge: source is faction-2 (de_escalate → #4a90d9)
+      expect(edges[1]?.getAttribute('stroke')).toBe('#4a90d9');
+      expect(edges[1]?.getAttribute('stroke-opacity')).toBe('0.3');
     });
 
     it('renders node labels', () => {

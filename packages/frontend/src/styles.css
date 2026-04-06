@@ -1,70 +1,179 @@
 /* ================================================================
-   Swarm Intelligence Gateway — Dashboard Styles
+   Swarm Intelligence Gateway — Command Center Dashboard
+   Aesthetic: Bloomberg Terminal meets STRATCOM Briefing Room
+   Fonts: JetBrains Mono (headers) + DM Sans (body)
    ================================================================ */
 
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
 :root {
-  --bg-primary: #0a0a0f;
-  --bg-card: #12121f;
-  --bg-panel: #0f0f1a;
-  --bg-hover: #1a1a2e;
-  --border: #1e1e35;
-  --text-primary: #e0e0e0;
-  --text-secondary: #8888aa;
-  --text-muted: #555570;
-  --accent: #7aa2f7;
-  --accent-dim: #3d5a99;
+  /* ── Surface Layers (deepest to lightest) ── */
+  --bg-abyss: #060810;
+  --bg-primary: #0a0b10;
+  --bg-elevated: #0f1118;
+  --bg-card: #141722;
+  --bg-card-hover: #191d2b;
+  --bg-surface: #1c2030;
+  --bg-surface-light: #232840;
+
+  /* ── Borders ── */
+  --border: #1e2238;
+  --border-accent: #2a3352;
+  --border-glow: rgba(0, 212, 170, 0.25);
+
+  /* ── Text ── */
+  --text-primary: #e2e4ec;
+  --text-secondary: #8a8faa;
+  --text-muted: #525878;
+  --text-accent: #00d4aa;
+
+  /* ── Accent (teal/cyan — tactical intelligence) ── */
+  --accent: #00d4aa;
+  --accent-dim: #00a385;
+  --accent-glow: rgba(0, 212, 170, 0.12);
+  --accent-glow-strong: rgba(0, 212, 170, 0.3);
+
+  /* ── Status Colors (per PRD spec) ── */
   --red: #e05252;
   --blue: #4a90d9;
   --yellow: #d4a843;
   --purple: #9b59b6;
   --gray: #888;
   --green: #4ade80;
-  --radius: 10px;
-  --radius-sm: 6px;
+
+  /* ── Radii ── */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 4px;
+
+  /* ── Fonts ── */
+  --font-display: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', monospace;
+  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* ── Transitions ── */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* ── Reset ────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+/* ── Scrollbar ────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
   background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-surface);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-surface-light);
+}
+
+/* ── Body & Background ────────────────────────────────────────────── */
+body {
+  font-family: var(--font-body);
+  background: var(--bg-abyss);
   color: var(--text-primary);
   min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── App Layout ─────────────────────────────────────────────────── */
+/* Subtle dot grid pattern overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.025) 1px, transparent 0);
+  background-size: 32px 32px;
+}
+
+/* Subtle radial glow at top center */
+body::after {
+  content: '';
+  position: fixed;
+  top: -30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120%;
+  height: 60%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(0, 212, 170, 0.03) 0%, transparent 70%);
+}
+
+/* ── App Layout ───────────────────────────────────────────────────── */
 #app {
+  position: relative;
+  z-index: 1;
   width: 100%;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
+/* ── Header ───────────────────────────────────────────────────────── */
 #header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
-  height: 56px;
-  background: var(--bg-panel);
+  padding: 0 28px;
+  height: 60px;
+  background: var(--bg-elevated);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  backdrop-filter: blur(12px);
+  position: relative;
+}
+
+/* Subtle accent line under header */
+#header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-glow-strong), transparent);
 }
 
 #header h1 {
-  font-size: 18px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
   color: var(--accent);
-  letter-spacing: -0.3px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 #header .header-badge {
-  font-size: 11px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 500;
   color: var(--text-muted);
-  background: var(--bg-hover);
-  padding: 3px 10px;
-  border-radius: 12px;
+  background: var(--bg-surface);
+  padding: 4px 14px;
+  border-radius: 20px;
   border: 1px solid var(--border);
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 /* Globe hidden when empty */
@@ -72,14 +181,14 @@ body {
   display: none;
 }
 
-/* ── Panel Container (Dashboard Grid) ───────────────────────────── */
+/* ── Panel Container (Dashboard Grid) ─────────────────────────────── */
 #panel-container {
   flex: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: auto auto;
-  gap: 16px;
-  padding: 20px 24px;
+  gap: 20px;
+  padding: 24px 28px;
   overflow-y: auto;
 }
 
@@ -88,105 +197,168 @@ body {
   grid-column: 1 / -1;
 }
 
+/* ── Panel (Section Wrapper) ──────────────────────────────────────── */
 .panel {
-  background: var(--bg-panel);
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  position: relative;
+  animation: panelFadeIn 0.5s ease-out both;
 }
 
+.panel:nth-child(1) { animation-delay: 0.05s; }
+.panel:nth-child(2) { animation-delay: 0.15s; }
+.panel:nth-child(3) { animation-delay: 0.25s; }
+.panel:nth-child(4) { animation-delay: 0.35s; }
+
+@keyframes panelFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Panel Header ─────────────────────────────────────────────────── */
 .panel > h2 {
-  font-size: 14px;
+  font-family: var(--font-display);
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--text-secondary);
-  padding: 14px 18px 0;
+  letter-spacing: 1.5px;
+  color: var(--accent);
+  padding: 18px 22px 0;
   margin-bottom: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Tactical left accent bar on panel headers */
+.panel > h2::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 2px;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px var(--accent-glow-strong);
 }
 
 .panel-description {
   font-size: 12px;
   color: var(--text-muted);
-  padding: 2px 18px 0;
-  line-height: 1.4;
+  padding: 4px 22px 0 35px;
+  line-height: 1.5;
 }
 
 .panel-content {
-  padding: 12px 18px 18px;
+  padding: 14px 22px 22px;
 }
 
-/* ── Theater Filter Bar ─────────────────────────────────────────── */
+/* ── Theater Filter Bar ───────────────────────────────────────────── */
 .theater-filter-bar {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .theater-filter-bar button {
+  font-family: var(--font-display);
   background: var(--bg-card);
   border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 12px;
-  padding: 5px 12px;
-  border-radius: 16px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 16px;
+  border-radius: 20px;
   cursor: pointer;
-  transition: all 0.15s ease;
-  font-family: inherit;
+  transition: all var(--transition-fast);
+  letter-spacing: 0.5px;
+  text-transform: capitalize;
 }
 
 .theater-filter-bar button:hover {
-  background: var(--bg-hover);
+  background: var(--bg-surface);
   color: var(--text-primary);
-  border-color: var(--accent-dim);
+  border-color: var(--border-accent);
 }
 
 .theater-filter-bar button.active {
-  background: var(--accent-dim);
-  color: #fff;
+  background: var(--accent-glow);
+  color: var(--accent);
   border-color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow), inset 0 0 12px var(--accent-glow);
 }
 
-/* ── Theater Cards Grid ─────────────────────────────────────────── */
+/* ── Theater Cards Grid ───────────────────────────────────────────── */
 .theater-grid {
-  gap: 14px !important;
+  gap: 16px !important;
 }
 
 .theater-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 18px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-smooth);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+
+/* Glass shimmer on card top edge */
+.theater-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
 }
 
 .theater-card:hover {
   border-color: var(--accent-dim);
-  background: #161628;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  background: var(--bg-card-hover);
+  transform: translateY(-3px);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px var(--border-glow),
+    0 0 24px var(--accent-glow);
 }
 
 .theater-card h3 {
-  font-size: 16px;
+  font-family: var(--font-body);
+  font-size: 15px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary);
   margin: 0;
+  line-height: 1.3;
 }
 
 .agent-count-badge {
-  font-size: 11px;
-  color: var(--text-muted);
-  background: var(--bg-hover);
-  padding: 2px 8px;
-  border-radius: 10px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-glow);
+  padding: 3px 10px;
+  border-radius: 12px;
   display: inline-block;
   width: fit-content;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(0, 212, 170, 0.15);
 }
 
 .agent-count-badge::before {
@@ -196,17 +368,17 @@ body {
 .top-prediction {
   font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.4;
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* ── Round Progress Bar ─────────────────────────────────────────── */
+/* ── Round Progress Bar ───────────────────────────────────────────── */
 .round-progress-bar {
-  height: 4px;
-  background: var(--bg-hover);
+  height: 3px;
+  background: var(--bg-surface);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -215,9 +387,10 @@ body {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--green));
   border-radius: 2px;
+  box-shadow: 0 0 8px rgba(0, 212, 170, 0.4);
 }
 
-/* ── Confidence Gauge ───────────────────────────────────────────── */
+/* ── Confidence Gauge ─────────────────────────────────────────────── */
 .confidence-gauge {
   display: flex;
   align-items: center;
@@ -225,61 +398,79 @@ body {
 }
 
 .confidence-gauge svg {
-  filter: drop-shadow(0 0 6px rgba(74, 144, 217, 0.3));
+  filter: drop-shadow(0 0 8px rgba(0, 212, 170, 0.2));
 }
 
 .gauge-arc {
-  transition: stroke-dashoffset 0.6s ease;
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ── Faction Split Bar ──────────────────────────────────────────── */
+/* ── Faction Split Bar ────────────────────────────────────────────── */
 .faction-split-bar {
   display: flex;
-  height: 6px;
+  height: 8px;
   border-radius: 4px;
   overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .faction-segment {
   min-width: 4px;
-  transition: flex-basis 0.3s ease;
+  transition: flex-basis var(--transition-smooth);
+  position: relative;
 }
 
-/* ── Theater Empty ──────────────────────────────────────────────── */
+.faction-segment:hover {
+  filter: brightness(1.3);
+}
+
+/* ── Theater Empty ────────────────────────────────────────────────── */
 .theater-empty {
   color: var(--text-muted);
   text-align: center;
-  padding: 40px 20px;
+  padding: 48px 20px;
   font-size: 14px;
   grid-column: 1 / -1;
+  font-family: var(--font-display);
+  letter-spacing: 0.5px;
 }
 
-/* ── Debate Feed ────────────────────────────────────────────────── */
+/* ── Debate Feed ──────────────────────────────────────────────────── */
 .debate-feed {
   max-height: 400px;
   overflow-y: auto;
 }
 
 .debate-back-btn {
+  font-family: var(--font-display);
   background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--accent);
-  font-size: 12px;
-  padding: 6px 14px;
-  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 7px 18px;
+  border-radius: 20px;
   cursor: pointer;
-  margin-bottom: 12px;
-  font-family: inherit;
-  transition: background 0.15s;
+  margin-bottom: 14px;
+  transition: all var(--transition-fast);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .debate-back-btn:hover {
-  background: var(--bg-hover);
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 .debate-post {
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--border);
+  transition: background var(--transition-fast);
+}
+
+.debate-post:hover {
+  background: rgba(255, 255, 255, 0.015);
 }
 
 .debate-post:last-child {
@@ -290,7 +481,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .faction-dot {
@@ -299,33 +490,39 @@ body {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
 }
 
 .debate-username {
+  font-family: var(--font-display);
   font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
+  letter-spacing: 0.3px;
 }
 
 .debate-timestamp {
+  font-family: var(--font-display);
   font-size: 10px;
   color: var(--text-muted);
   margin-left: auto;
+  letter-spacing: 0.5px;
 }
 
 .debate-content {
   font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
-/* ── Faction Map Panel ──────────────────────────────────────────── */
+/* ── Faction Map Panel ────────────────────────────────────────────── */
 .faction-map-container {
   width: 100%;
   min-height: 280px;
   background: var(--bg-card);
   border-radius: var(--radius-sm);
   overflow: hidden;
+  position: relative;
 }
 
 .faction-map-container svg {
@@ -335,25 +532,34 @@ body {
 
 .faction-tooltip {
   position: absolute;
-  background: rgba(15, 15, 26, 0.95);
-  border: 1px solid var(--border);
+  background: rgba(10, 11, 16, 0.95);
+  border: 1px solid var(--border-accent);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
+  padding: 10px 14px;
   font-size: 12px;
   color: var(--text-primary);
   pointer-events: none;
   z-index: 10;
-  max-width: 200px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  max-width: 220px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border);
+  backdrop-filter: blur(12px);
+  line-height: 1.6;
 }
 
-/* ── Prediction Timeline Panel ──────────────────────────────────── */
+.faction-tooltip strong {
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+/* ── Prediction Timeline Panel ────────────────────────────────────── */
 .prediction-timeline-container {
   width: 100%;
   min-height: 250px;
   background: var(--bg-card);
   border-radius: var(--radius-sm);
-  padding: 8px;
+  padding: 10px;
 }
 
 .prediction-timeline-container svg {
@@ -364,6 +570,7 @@ body {
 .timeline-axis text {
   fill: var(--text-muted);
   font-size: 10px;
+  font-family: var(--font-display);
 }
 
 .timeline-axis line {
@@ -372,118 +579,182 @@ body {
 
 .timeline-dot {
   cursor: pointer;
-  transition: r 0.15s ease;
+  transition: r var(--transition-fast), filter var(--transition-fast);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.15));
 }
 
 .timeline-dot:hover {
-  r: 7;
+  r: 8;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
 }
 
-.timeline-tooltip {
+.timeline-tooltip,
+.prediction-tooltip {
   position: absolute;
-  background: rgba(15, 15, 26, 0.95);
-  border: 1px solid var(--border);
+  background: rgba(10, 11, 16, 0.95);
+  border: 1px solid var(--border-accent);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
+  padding: 10px 14px;
   font-size: 12px;
   color: var(--text-primary);
   pointer-events: none;
   z-index: 10;
-  max-width: 240px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  max-width: 260px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  line-height: 1.6;
+}
+
+.timeline-tooltip strong,
+.prediction-tooltip strong {
+  color: var(--accent);
+  font-family: var(--font-display);
 }
 
 .timeline-empty {
   color: var(--text-muted);
   text-align: center;
-  padding: 40px;
+  padding: 48px;
   font-size: 13px;
+  font-family: var(--font-display);
+  letter-spacing: 0.5px;
 }
 
-/* ── Consensus Heatmap Controls ─────────────────────────────────── */
+/* ── Consensus Heatmap Controls ───────────────────────────────────── */
 .heatmap-controls {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .heatmap-toggle {
+  font-family: var(--font-display);
   background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  font-size: 13px;
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 10px 20px;
+  border-radius: 20px;
   cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
   width: fit-content;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .heatmap-toggle:hover {
-  background: var(--bg-hover);
-  border-color: var(--accent-dim);
+  background: var(--bg-surface);
+  border-color: var(--border-accent);
 }
 
 .heatmap-toggle.active {
-  background: var(--accent-dim);
+  background: var(--accent-glow);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow), inset 0 0 12px var(--accent-glow);
 }
 
 .heatmap-slider-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-size: 13px;
   color: var(--text-secondary);
 }
 
+.heatmap-slider-row label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .heatmap-slider-row input[type="range"] {
   flex: 1;
-  accent-color: var(--accent);
+  -webkit-appearance: none;
+  appearance: none;
   height: 4px;
+  background: var(--bg-surface);
+  border-radius: 2px;
+  outline: none;
+}
+
+.heatmap-slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--accent-glow-strong);
+  border: 2px solid var(--bg-card);
+}
+
+.heatmap-slider-row input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--accent-glow-strong);
+  border: 2px solid var(--bg-card);
 }
 
 .heatmap-slider-row .threshold-value {
+  font-family: var(--font-display);
   font-weight: 600;
-  color: var(--text-primary);
-  min-width: 30px;
+  color: var(--accent);
+  min-width: 36px;
+  text-align: right;
+  font-size: 13px;
 }
 
 .heatmap-legend {
-  height: 10px;
-  border-radius: 5px;
+  height: 6px;
+  border-radius: 3px;
   background: linear-gradient(90deg, var(--green), var(--yellow), var(--red));
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.1), 0 0 12px rgba(224, 82, 82, 0.1);
 }
 
 .heatmap-legend-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-family: var(--font-display);
+  font-size: 10px;
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .heatmap-status {
-  font-size: 12px;
+  font-family: var(--font-display);
+  font-size: 11px;
   color: var(--text-muted);
+  letter-spacing: 0.5px;
 }
 
-/* ── Color Legend (inline) ───────────────────────────────────────── */
+/* ── Color Legend (inline) ────────────────────────────────────────── */
 .color-legend {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .color-legend-item {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 11px;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 10px;
   color: var(--text-muted);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
 }
 
 .color-legend-dot {
@@ -491,14 +762,69 @@ body {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
 }
 
-/* ── Responsive ─────────────────────────────────────────────────── */
+/* ── Faction Map SVG Styles ───────────────────────────────────────── */
+.faction-map-svg .faction-node {
+  transition: opacity var(--transition-fast);
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1.5;
+}
+
+.faction-map-svg .faction-node:hover {
+  opacity: 0.85;
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 2;
+}
+
+.faction-map-svg .faction-edge {
+  opacity: 0.6;
+}
+
+.faction-map-svg .faction-label {
+  font-family: var(--font-display);
+  pointer-events: none;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8), 0 0 8px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Prediction Timeline SVG Styles ───────────────────────────────── */
+.prediction-timeline-svg .prediction-dot {
+  stroke: rgba(0, 0, 0, 0.4);
+  stroke-width: 1.5;
+  transition: r var(--transition-fast), filter var(--transition-fast);
+}
+
+.prediction-timeline-svg .prediction-dot:hover {
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+.prediction-timeline-svg .theater-line {
+  opacity: 0.5;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   #panel-container {
     grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 16px;
   }
   #panel-container .panel:first-child {
     grid-column: 1;
   }
+  #header {
+    padding: 0 16px;
+  }
+  #header h1 {
+    font-size: 13px;
+  }
+}
+
+/* ── Selection Color ──────────────────────────────────────────────── */
+::selection {
+  background: var(--accent-glow-strong);
+  color: var(--text-primary);
 }
