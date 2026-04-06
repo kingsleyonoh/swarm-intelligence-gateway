@@ -118,23 +118,27 @@ export class MirofishClient {
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {
-      const status = await this.requestWithRetry<TaskStatusResponse>(
+      const response = await this.requestWithRetry<Record<string, unknown>>(
         `${this.baseUrl}/api/graph/task/${taskId}`,
         { method: 'GET' },
       );
 
-      if (status.status === 'complete' || status.status === 'completed') {
+      // MiroFish wraps task status under `data`: { data: { status }, success }
+      const taskData = (response.data ?? response) as TaskStatusResponse;
+      const taskStatus = taskData.status;
+
+      if (taskStatus === 'complete' || taskStatus === 'completed') {
         log.info({ taskId, label }, `${label} complete`);
         return;
       }
 
-      if (status.status === 'error' || status.status === 'failed') {
+      if (taskStatus === 'error' || taskStatus === 'failed') {
         throw new Error(
-          `${label} failed: ${status.error ?? 'unknown error'}`,
+          `${label} failed: ${taskData.error ?? 'unknown error'}`,
         );
       }
 
-      log.debug({ taskId, label, status: status.status }, `${label} still processing`);
+      log.debug({ taskId, label, status: taskStatus }, `${label} still processing`);
       await sleep(this.ontologyPollIntervalMs);
     }
 
