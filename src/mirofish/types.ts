@@ -10,26 +10,36 @@
 /**
  * Response from `POST /api/graph/ontology/generate`.
  * Ontology generation is synchronous — returns after LLM finishes.
- * No polling needed.
+ * The project_id is nested under `data`.
  */
 export interface OntologyGenerateResponse {
-  project_id: string;
+  data: {
+    project_id: string;
+    [key: string]: unknown;
+  };
+  success: boolean;
 }
 
-/** Response from `POST /api/graph/build` — returns build status. */
+/** Response from `POST /api/graph/build` — async, returns task ID for polling. */
 export interface BuildResponse {
-  status: string;
+  data: {
+    task_id: string;
+    project_id: string;
+    message: string;
+  };
+  success: boolean;
+}
+
+/** Response from `GET /api/graph/task/:taskId` — task polling status. */
+export interface TaskStatusResponse {
+  status: 'pending' | 'processing' | 'complete' | 'completed' | 'error' | 'failed';
+  error?: string;
+  [key: string]: unknown;
 }
 
 /** Response from `POST /api/simulation/start` — returns simulation ID for polling. */
 export interface SimulationStartResponse {
   simulation_id: string;
-}
-
-/** Response from `GET /api/graph/task/:taskId` — ontology processing status. */
-export interface OntologyStatusResponse {
-  status: 'pending' | 'processing' | 'complete' | 'error';
-  error?: string;
 }
 
 /** Response from `GET /api/simulation/:simId/run-status` — simulation run status. */

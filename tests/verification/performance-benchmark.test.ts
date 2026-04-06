@@ -106,7 +106,7 @@ const realisticReport = `
 
 const mocks = vi.hoisted(() => ({
   generateOntology: vi.fn(),
-  pollOntologyStatus: vi.fn(),
+  pollTask: vi.fn(),
   buildGraph: vi.fn(),
   startSimulation: vi.fn(),
   pollSimulationStatus: vi.fn(),
@@ -120,7 +120,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../src/mirofish/client.js', () => ({
   MirofishClient: class MockMirofishClient {
     generateOntology = mocks.generateOntology;
-    pollOntologyStatus = mocks.pollOntologyStatus;
+    pollTask = mocks.pollTask;
     buildGraph = mocks.buildGraph;
     startSimulation = mocks.startSimulation;
     pollSimulationStatus = mocks.pollSimulationStatus;
@@ -203,9 +203,9 @@ function setupDbMocksForPipeline() {
 }
 
 function setupMirofishInstantMocks() {
-  mocks.generateOntology.mockResolvedValue({ project_id: 'mf-proj-001' });
-  mocks.pollOntologyStatus.mockResolvedValue(undefined);
-  mocks.buildGraph.mockResolvedValue({ status: 'ok' });
+  mocks.generateOntology.mockResolvedValue({ data: { project_id: 'mf-proj-001' }, success: true });
+  mocks.pollTask.mockResolvedValue(undefined);
+  mocks.buildGraph.mockResolvedValue({ data: { task_id: 'build-task-001', project_id: 'mf-proj-001', message: 'ok' }, success: true });
   mocks.startSimulation.mockResolvedValue({ simulation_id: 'mf-sim-001' });
   mocks.pollSimulationStatus.mockResolvedValue(undefined);
   mocks.getReport.mockResolvedValue({ report: realisticReport });

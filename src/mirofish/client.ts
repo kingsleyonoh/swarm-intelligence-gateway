@@ -17,7 +17,7 @@ import type {
   BuildResponse,
   MirofishConfig,
   OntologyGenerateResponse,
-  OntologyStatusResponse,
+  TaskStatusResponse,
   SimulationReportResponse,
   SimulationStartResponse,
   SimulationStatusResponse,
@@ -101,42 +101,45 @@ export class MirofishClient {
   }
 
   /**
-   * Poll ontology status until complete or timeout.
+   * Poll a MiroFish async task until complete or timeout.
    *
    * `GET /api/graph/task/:taskId` — polls every 5 seconds.
+   * Used after buildGraph (and any other async operation).
    *
-   * @param taskId - MiroFish task ID returned by generateOntology
+   * @param taskId - MiroFish task ID
+   * @param label - Human-readable label for log messages (e.g. "Graph build")
    * @param timeoutMs - Maximum wait time (default 10 minutes)
    */
-  async pollOntologyStatus(
+  async pollTask(
     taskId: string,
+    label: string = 'Task',
     timeoutMs: number = 600_000,
   ): Promise<void> {
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {
-      const status = await this.requestWithRetry<OntologyStatusResponse>(
+      const status = await this.requestWithRetry<TaskStatusResponse>(
         `${this.baseUrl}/api/graph/task/${taskId}`,
         { method: 'GET' },
       );
 
-      if (status.status === 'complete') {
-        log.info({ taskId }, 'Ontology generation complete');
+      if (status.status === 'complete' || status.status === 'completed') {
+        log.info({ taskId, label }, `${label} complete`);
         return;
       }
 
-      if (status.status === 'error') {
+      if (status.status === 'error' || status.status === 'failed') {
         throw new Error(
-          `Ontology generation failed: ${status.error ?? 'unknown error'}`,
+          `${label} failed: ${status.error ?? 'unknown error'}`,
         );
       }
 
-      log.debug({ taskId, status: status.status }, 'Ontology still processing');
+      log.debug({ taskId, label, status: status.status }, `${label} still processing`);
       await sleep(this.ontologyPollIntervalMs);
     }
 
     throw new Error(
-      `Ontology generation timed out after ${timeoutMs}ms for task ${taskId}`,
+      `${label} timed out after ${timeoutMs}ms for task ${taskId}`,
     );
   }
 

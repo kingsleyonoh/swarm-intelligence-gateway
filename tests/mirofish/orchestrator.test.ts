@@ -53,7 +53,7 @@ function testScenario() {
 const mocks = vi.hoisted(() => {
   // MiroFish client mock
   const generateOntology = vi.fn();
-  const pollOntologyStatus = vi.fn();
+  const pollTask = vi.fn();
   const buildGraph = vi.fn();
   const startSimulation = vi.fn();
   const pollSimulationStatus = vi.fn();
@@ -66,7 +66,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     generateOntology,
-    pollOntologyStatus,
+    pollTask,
     buildGraph,
     startSimulation,
     pollSimulationStatus,
@@ -81,7 +81,7 @@ const mocks = vi.hoisted(() => {
 vi.mock('../../src/mirofish/client.js', () => ({
   MirofishClient: class MockMirofishClient {
     generateOntology = mocks.generateOntology;
-    pollOntologyStatus = mocks.pollOntologyStatus;
+    pollTask = mocks.pollTask;
     buildGraph = mocks.buildGraph;
     startSimulation = mocks.startSimulation;
     pollSimulationStatus = mocks.pollSimulationStatus;
@@ -178,8 +178,9 @@ function setupSuccessfulDbMocks() {
 
 /** Configure MiroFish client mocks for a fully successful pipeline. */
 function setupSuccessfulMirofishMocks() {
-  mocks.generateOntology.mockResolvedValue({ project_id: 'mf-proj-001' });
-  mocks.buildGraph.mockResolvedValue({ status: 'ok' });
+  mocks.generateOntology.mockResolvedValue({ data: { project_id: 'mf-proj-001' }, success: true });
+  mocks.buildGraph.mockResolvedValue({ data: { task_id: 'build-task-001', project_id: 'mf-proj-001', message: 'ok' }, success: true });
+  mocks.pollTask.mockResolvedValue(undefined);
   mocks.startSimulation.mockResolvedValue({ simulation_id: 'mf-sim-001' });
   mocks.pollSimulationStatus.mockResolvedValue(undefined);
   mocks.getReport.mockResolvedValue({

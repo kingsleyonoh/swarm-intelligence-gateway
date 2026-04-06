@@ -4,7 +4,7 @@ import type {
   OntologyGenerateResponse,
   BuildResponse,
   SimulationStartResponse,
-  OntologyStatusResponse,
+  TaskStatusResponse,
   SimulationStatusResponse,
   SimulationReportResponse,
 } from '../../src/mirofish/types.js';
@@ -218,43 +218,42 @@ describe('MirofishClient', () => {
     });
   });
 
-  // ── pollOntologyStatus ─────────────────────────────────────────────
+  // ── pollTask ─────────────────────────────────────────────
 
-  describe('pollOntologyStatus', () => {
+  describe('pollTask', () => {
     it('should poll until status is complete', async () => {
-      const pending: OntologyStatusResponse = { status: 'pending' };
-      const processing: OntologyStatusResponse = { status: 'processing' };
-      const complete: OntologyStatusResponse = { status: 'complete' };
+      const pending: TaskStatusResponse = { status: 'pending' };
+      const processing: TaskStatusResponse = { status: 'processing' };
+      const complete: TaskStatusResponse = { status: 'complete' };
 
       mocks.request
         .mockResolvedValueOnce(mockResponse(200, pending))
         .mockResolvedValueOnce(mockResponse(200, processing))
         .mockResolvedValueOnce(mockResponse(200, complete));
 
-      await client.pollOntologyStatus('task-123', 60_000);
+      await client.pollTask('task-123', 'Test', 60_000);
 
       expect(mocks.request).toHaveBeenCalledTimes(3);
     });
 
-    it('should throw on error status from ontology', async () => {
-      const errorResp: OntologyStatusResponse = {
+    it('should throw on error status', async () => {
+      const errorResp: TaskStatusResponse = {
         status: 'error',
         error: 'Graph build failed',
       };
       mocks.request.mockResolvedValue(mockResponse(200, errorResp));
 
       await expect(
-        client.pollOntologyStatus('task-123', 60_000),
+        client.pollTask('task-123', 'Test', 60_000),
       ).rejects.toThrow(/Graph build failed/);
     });
 
-    it('should throw on timeout when ontology never completes', async () => {
-      const pending: OntologyStatusResponse = { status: 'processing' };
+    it('should throw on timeout when task never completes', async () => {
+      const pending: TaskStatusResponse = { status: 'processing' };
       mocks.request.mockResolvedValue(mockResponse(200, pending));
 
-      // Use a very short timeout for test speed
       await expect(
-        client.pollOntologyStatus('task-123', 100),
+        client.pollTask('task-123', 'Test', 100),
       ).rejects.toThrow(/timed out/i);
     });
   });

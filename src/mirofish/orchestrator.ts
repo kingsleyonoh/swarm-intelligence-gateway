@@ -230,20 +230,27 @@ export async function runSimulation(
       seedDocument: seedMarkdown,
     });
 
-    const { project_id: mirofishProjectId } = await mirofishClient.generateOntology(
+    const ontologyResult = await mirofishClient.generateOntology(
       seedMarkdown,
       scenario.simulationRequirement,
       `sim-${simulationId}`,
     );
+
+    const mirofishProjectId = ontologyResult.data.project_id;
 
     // Store MiroFish project ID
     await updateSimulationStatus(simulationId, SIMULATION_STATUS.GRAPH_BUILDING, {
       mirofishProjectId,
     });
 
-    // Ontology generation is synchronous in MiroFish — no polling needed.
-    // Go straight to graph build.
-    await mirofishClient.buildGraph(mirofishProjectId);
+    // Ontology generation is synchronous — go straight to graph build.
+    // Graph build is ASYNC — returns a task_id we need to poll.
+    const buildResult = await mirofishClient.buildGraph(mirofishProjectId);
+    const buildTaskId = buildResult.data?.task_id;
+
+    if (buildTaskId) {
+      await mirofishClient.pollTask(buildTaskId, 'Graph build', ONTOLOGY_TIMEOUT_MS);
+    }
 
     log.info({ simulationId, mirofishProjectId }, 'Graph build phase complete');
 
