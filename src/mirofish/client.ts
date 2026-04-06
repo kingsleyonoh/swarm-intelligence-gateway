@@ -18,6 +18,7 @@ import type {
   MirofishConfig,
   OntologyGenerateResponse,
   TaskStatusResponse,
+  SimulationCreateResponse,
   SimulationReportResponse,
   SimulationStartResponse,
   SimulationStatusResponse,
@@ -164,12 +165,31 @@ export class MirofishClient {
   }
 
   /**
-   * Start a swarm simulation.
+   * Create a simulation from a project.
    *
-   * `POST /api/simulation/start` — JSON `{ project_id, config }`.
+   * `POST /api/simulation/create` — JSON `{ project_id }`.
+   * Must be called before `startSimulation`.
+   */
+  async createSimulation(
+    projectId: string,
+  ): Promise<SimulationCreateResponse> {
+    return this.requestWithRetry<SimulationCreateResponse>(
+      `${this.baseUrl}/api/simulation/create`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId }),
+      },
+    );
+  }
+
+  /**
+   * Start a previously created simulation.
+   *
+   * `POST /api/simulation/start` — JSON `{ simulation_id, ... }`.
    */
   async startSimulation(
-    projectId: string,
+    simulationId: string,
     config: MirofishConfig,
   ): Promise<SimulationStartResponse> {
     return this.requestWithRetry<SimulationStartResponse>(
@@ -177,7 +197,11 @@ export class MirofishClient {
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId, config }),
+        body: JSON.stringify({
+          simulation_id: simulationId,
+          agent_count: config.agentCount,
+          round_count: config.roundCount,
+        }),
       },
     );
   }
@@ -197,23 +221,27 @@ export class MirofishClient {
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {
-      const status = await this.requestWithRetry<SimulationStatusResponse>(
+      const response = await this.requestWithRetry<Record<string, unknown>>(
         `${this.baseUrl}/api/simulation/${simId}/run-status`,
         { method: 'GET' },
       );
 
-      if (status.status === 'complete') {
+      // MiroFish may wrap under `data` or return flat
+      const simData = (response.data ?? response) as SimulationStatusResponse;
+      const simStatus = simData.status;
+
+      if (simStatus === 'complete' || simStatus === 'completed') {
         log.info({ simId }, 'Simulation complete');
         return;
       }
 
-      if (status.status === 'error') {
+      if (simStatus === 'error' || simStatus === 'failed') {
         throw new Error(
-          `Simulation failed: ${status.error ?? 'unknown error'}`,
+          `Simulation failed: ${simData.error ?? 'unknown error'}`,
         );
       }
 
-      log.debug({ simId, status: status.status, progress: status.progress }, 'Simulation running');
+      log.debug({ simId, status: simStatus, progress: simData.progress }, 'Simulation running');
       await sleep(this.simulationPollIntervalMs);
     }
 

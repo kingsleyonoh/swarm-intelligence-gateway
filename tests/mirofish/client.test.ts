@@ -193,27 +193,24 @@ describe('MirofishClient', () => {
 
   describe('startSimulation', () => {
     it('should send POST to /api/simulation/start with config', async () => {
-      const responseBody: SimulationStartResponse = { simulation_id: 'sim-001' };
+      const responseBody: SimulationStartResponse = { success: true };
       mocks.request.mockResolvedValue(mockResponse(200, responseBody));
 
-      const result = await client.startSimulation('proj-123', {
+      const result = await client.startSimulation('sim-001', {
         agentCount: 4096,
         roundCount: 5,
         llmProvider: 'deepseek',
       });
 
-      expect(result).toEqual({ simulation_id: 'sim-001' });
+      expect(result).toEqual({ success: true });
 
       const callArgs = mocks.request.mock.calls[0];
       expect(callArgs[0]).toBe('http://localhost:5000/api/simulation/start');
       const parsedBody = JSON.parse(callArgs[1].body);
       expect(parsedBody).toEqual({
-        project_id: 'proj-123',
-        config: {
-          agentCount: 4096,
-          roundCount: 5,
-          llmProvider: 'deepseek',
-        },
+        simulation_id: 'sim-001',
+        agent_count: 4096,
+        round_count: 5,
       });
     });
   });

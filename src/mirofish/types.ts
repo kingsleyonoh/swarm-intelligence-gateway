@@ -37,14 +37,28 @@ export interface TaskStatusResponse {
   [key: string]: unknown;
 }
 
-/** Response from `POST /api/simulation/start` — returns simulation ID for polling. */
+/** Response from `POST /api/simulation/create` — creates a simulation, returns ID. */
+export interface SimulationCreateResponse {
+  data: {
+    simulation_id: string;
+    status: string;
+    [key: string]: unknown;
+  };
+  success: boolean;
+}
+
+/** Response from `POST /api/simulation/start` — starts the simulation. */
 export interface SimulationStartResponse {
-  simulation_id: string;
+  data?: {
+    simulation_id: string;
+    [key: string]: unknown;
+  };
+  success: boolean;
 }
 
 /** Response from `GET /api/simulation/:simId/run-status` — simulation run status. */
 export interface SimulationStatusResponse {
-  status: 'running' | 'complete' | 'error';
+  status: 'running' | 'complete' | 'completed' | 'error' | 'failed' | string;
   progress?: number;
   error?: string;
 }

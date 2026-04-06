@@ -55,6 +55,7 @@ const mocks = vi.hoisted(() => {
   const generateOntology = vi.fn();
   const pollTask = vi.fn();
   const buildGraph = vi.fn();
+  const createSimulation = vi.fn();
   const startSimulation = vi.fn();
   const pollSimulationStatus = vi.fn();
   const getReport = vi.fn();
@@ -68,6 +69,7 @@ const mocks = vi.hoisted(() => {
     generateOntology,
     pollTask,
     buildGraph,
+    createSimulation,
     startSimulation,
     pollSimulationStatus,
     getReport,
@@ -83,6 +85,7 @@ vi.mock('../../src/mirofish/client.js', () => ({
     generateOntology = mocks.generateOntology;
     pollTask = mocks.pollTask;
     buildGraph = mocks.buildGraph;
+    createSimulation = mocks.createSimulation;
     startSimulation = mocks.startSimulation;
     pollSimulationStatus = mocks.pollSimulationStatus;
     getReport = mocks.getReport;
@@ -181,7 +184,8 @@ function setupSuccessfulMirofishMocks() {
   mocks.generateOntology.mockResolvedValue({ data: { project_id: 'mf-proj-001' }, success: true });
   mocks.buildGraph.mockResolvedValue({ data: { task_id: 'build-task-001', project_id: 'mf-proj-001', message: 'ok' }, success: true });
   mocks.pollTask.mockResolvedValue(undefined);
-  mocks.startSimulation.mockResolvedValue({ simulation_id: 'mf-sim-001' });
+  mocks.createSimulation.mockResolvedValue({ data: { simulation_id: 'mf-sim-001', status: 'created' }, success: true });
+  mocks.startSimulation.mockResolvedValue({ success: true });
   mocks.pollSimulationStatus.mockResolvedValue(undefined);
   mocks.getReport.mockResolvedValue({
     report: `## Simulation Report
@@ -250,7 +254,7 @@ describe('runSimulation', () => {
       expect(mocks.buildGraph).toHaveBeenCalledWith('mf-proj-001');
     });
 
-    it('should call startSimulation with project ID and config', async () => {
+    it('should create then start simulation with config', async () => {
       await runSimulation({
         scenarioId: 'scenario-001',
         tenantId: 'tenant-001',
@@ -258,8 +262,9 @@ describe('runSimulation', () => {
         roundCount: 3,
       });
 
+      expect(mocks.createSimulation).toHaveBeenCalledWith('mf-proj-001');
       expect(mocks.startSimulation).toHaveBeenCalledWith(
-        'mf-proj-001',
+        'mf-sim-001',
         expect.objectContaining({
           agentCount: 2048,
           roundCount: 3,

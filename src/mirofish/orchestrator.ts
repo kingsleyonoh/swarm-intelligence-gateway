@@ -258,10 +258,11 @@ export async function runSimulation(
 
     await updateSimulationStatus(simulationId, SIMULATION_STATUS.SIMULATING);
 
-    const { simulation_id: mirofishSimId } = await mirofishClient.startSimulation(
-      mirofishProjectId,
-      config,
-    );
+    // MiroFish requires create → start (two-step)
+    const createResult = await mirofishClient.createSimulation(mirofishProjectId);
+    const mirofishSimId = createResult.data.simulation_id;
+
+    await mirofishClient.startSimulation(mirofishSimId, config);
 
     await mirofishClient.pollSimulationStatus(mirofishSimId, SIMULATION_TIMEOUT_MS);
 
