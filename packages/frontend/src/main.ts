@@ -27,7 +27,7 @@ import { SwarmPredictionsLayer } from './layers/SwarmPredictionsLayer.js';
 import { FactionBoundariesLayer } from './layers/FactionBoundariesLayer.js';
 import { ConsensusHeatLayer } from './layers/ConsensusHeatLayer.js';
 import { DataBridge } from './api/data-bridge.js';
-import { DemoApiClient } from './api/demo-client.js';
+import { loadDemoData } from './api/demo-loader.js';
 import type { Panel, MapLayerConstructor } from './types.js';
 
 // Phase 1: Initialize registries
@@ -86,39 +86,33 @@ for (const panel of panels) {
   mountedPanels.set(panel.id, panel);
 }
 
-// Detect demo mode from Vite env or absence of API key
-const isDemoMode =
-  (typeof import.meta !== 'undefined' &&
-    (import.meta as unknown as Record<string, Record<string, string>>).env
-      ?.VITE_DEMO_MODE === 'true') ||
-  false;
+// Detect demo mode: explicit env var OR no API key configured (dev default)
+const viteEnv = (import.meta as unknown as Record<string, Record<string, string>>).env ?? {};
+const apiKey = viteEnv.VITE_API_KEY ?? '';
+const isDemoMode = viteEnv.VITE_DEMO_MODE === 'true' || !apiKey;
 
-// Create demo client for static-site deployment (no backend required)
-const demoClient = isDemoMode ? new DemoApiClient('/demo') : null;
+let dataBridge: DataBridge | null = null;
 
-const dataBridge = new DataBridge({
-  apiBaseUrl: swarmVariant.apiBaseUrl || window.location.origin,
-  apiKey: '', // Set via config or env in production
-  refreshIntervals: swarmVariant.refreshIntervals,
-  panels: mountedPanels,
-});
-
-if (!isDemoMode) {
+if (isDemoMode) {
+  // Load demo data from static JSON files and feed to panels
+  loadDemoData(mountedPanels).catch((err) =>
+    console.warn('[swarm] Demo data load failed:', err),
+  );
+} else {
+  dataBridge = new DataBridge({
+    apiBaseUrl: swarmVariant.apiBaseUrl || window.location.origin,
+    apiKey,
+    refreshIntervals: swarmVariant.refreshIntervals,
+    panels: mountedPanels,
+  });
   dataBridge.startAll();
 }
 
 // Phase 8: Ready
 console.info(
   `[swarm] Boot complete. Variant: ${swarmVariant.name}. ` +
-    `Panels: ${panels.length}, Layers: ${layers.length}`,
+    `Panels: ${panels.length}, Layers: ${layers.length}, Demo: ${isDemoMode}`,
 );
 
 // Export for testing/debugging
-export {
-  panelRegistry,
-  layerRegistry,
-  variantLoader,
-  dataBridge,
-  demoClient,
-  isDemoMode,
-};
+export { panelRegistry, layerRegistry, variantLoader, dataBridge, isDemoMode };
