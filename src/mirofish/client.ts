@@ -283,22 +283,23 @@ export class MirofishClient {
         { method: 'GET' },
       );
 
-      // MiroFish may wrap under `data` or return flat
-      const simData = (response.data ?? response) as SimulationStatusResponse;
-      const simStatus = simData.status;
+      // MiroFish wraps under `data` and uses `runner_status` for completion
+      const simData = (response.data ?? response) as Record<string, unknown>;
+      const runnerStatus = simData.runner_status as string ?? simData.status as string ?? '';
+      const progress = simData.progress_percent as number ?? simData.progress as number ?? 0;
 
-      if (simStatus === 'complete' || simStatus === 'completed') {
-        log.info({ simId }, 'Simulation complete');
+      if (runnerStatus === 'complete' || runnerStatus === 'completed') {
+        log.info({ simId, progress }, 'Simulation complete');
         return;
       }
 
-      if (simStatus === 'error' || simStatus === 'failed') {
+      if (runnerStatus === 'error' || runnerStatus === 'failed') {
         throw new Error(
-          `Simulation failed: ${simData.error ?? 'unknown error'}`,
+          `Simulation failed: ${(simData.error as string) ?? 'unknown error'}`,
         );
       }
 
-      log.debug({ simId, status: simStatus, progress: simData.progress }, 'Simulation running');
+      log.debug({ simId, status: runnerStatus, progress }, 'Simulation running');
       await sleep(this.simulationPollIntervalMs);
     }
 
