@@ -29,10 +29,10 @@ export function createSimulationWorker(): Worker {
   const worker = new Worker(
     QUEUE_NAMES.RUN_SIMULATION,
     async (job) => {
-      const { scenarioId, tenantId, agentCount, roundCount, llmProvider } = job.data;
-      log.info({ jobId: job.id, scenarioId, tenantId }, 'Starting simulation job');
+      const { simulationId, scenarioId, tenantId, agentCount, roundCount, llmProvider } = job.data;
+      log.info({ jobId: job.id, simulationId, scenarioId, tenantId }, 'Starting simulation job');
 
-      await runSimulation({ scenarioId, tenantId, agentCount, roundCount, llmProvider });
+      await runSimulation({ simulationId, scenarioId, tenantId, agentCount, roundCount, llmProvider });
 
       log.info({ jobId: job.id, scenarioId }, 'Simulation job completed');
     },

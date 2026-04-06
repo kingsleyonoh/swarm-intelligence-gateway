@@ -62,6 +62,8 @@ const SIMULATION_TIMEOUT_MS = 1_800_000;
 // ── Orchestrator Parameters ─────────────────────────────────────────
 
 export interface RunSimulationParams {
+  /** If provided, use this existing simulation record instead of creating a new one. */
+  simulationId?: string;
   scenarioId: string;
   tenantId: string;
   agentCount?: number;
@@ -162,41 +164,51 @@ export async function runSimulation(
     throw new NotFoundError(`Scenario not found: ${scenarioId}`);
   }
 
-  // ── Step 2: Check for existing simulation ─────────────────────────
+  // ── Step 2: Use existing simulation or create new one ─────────────
 
-  const [existingSim] = await db
-    .select()
-    .from(simulations)
-    .where(
-      and(
-        eq(simulations.scenarioId, scenarioId),
-        eq(simulations.tenantId, tenantId),
-      ),
-    );
+  let simulationId: string;
 
-  if (existingSim) {
-    throw new ConflictError(
-      `Simulation already exists for scenario ${scenarioId}: ${existingSim.id}`,
-    );
-  }
-
-  // ── Step 3: Create simulation record ──────────────────────────────
-
-  const [simulation] = await db
-    .insert(simulations)
-    .values({
-      tenantId,
-      scenarioId,
-      status: SIMULATION_STATUS.QUEUED,
-      agentCount,
-      roundCount,
-      llmProvider,
+  if (params.simulationId) {
+    // Simulation already created by the API route — just update status
+    simulationId = params.simulationId;
+    await updateSimulationStatus(simulationId, SIMULATION_STATUS.QUEUED, {
       startedAt: new Date(),
-    })
-    .returning({ id: simulations.id });
+    });
+    log.info({ simulationId, scenarioId }, 'Using existing simulation record');
+  } else {
+    // No pre-created record — check for duplicates and create
+    const [existingSim] = await db
+      .select()
+      .from(simulations)
+      .where(
+        and(
+          eq(simulations.scenarioId, scenarioId),
+          eq(simulations.tenantId, tenantId),
+        ),
+      );
 
-  const simulationId = simulation.id;
-  log.info({ simulationId, scenarioId }, 'Simulation record created');
+    if (existingSim) {
+      throw new ConflictError(
+        `Simulation already exists for scenario ${scenarioId}: ${existingSim.id}`,
+      );
+    }
+
+    const [simulation] = await db
+      .insert(simulations)
+      .values({
+        tenantId,
+        scenarioId,
+        status: SIMULATION_STATUS.QUEUED,
+        agentCount,
+        roundCount,
+        llmProvider,
+        startedAt: new Date(),
+      })
+      .returning({ id: simulations.id });
+
+    simulationId = simulation.id;
+    log.info({ simulationId, scenarioId }, 'Simulation record created');
+  }
 
   const mirofishClient = new MirofishClient(
     env.MIROFISH_API_URL ?? 'http://localhost:5000',
@@ -218,7 +230,7 @@ export async function runSimulation(
       seedDocument: seedMarkdown,
     });
 
-    const { project_id: mirofishProjectId, task_id: taskId } = await mirofishClient.generateOntology(
+    const { project_id: mirofishProjectId } = await mirofishClient.generateOntology(
       seedMarkdown,
       scenario.simulationRequirement,
       `sim-${simulationId}`,
@@ -229,7 +241,8 @@ export async function runSimulation(
       mirofishProjectId,
     });
 
-    await mirofishClient.pollOntologyStatus(taskId, ONTOLOGY_TIMEOUT_MS);
+    // Ontology generation is synchronous in MiroFish — no polling needed.
+    // Go straight to graph build.
     await mirofishClient.buildGraph(mirofishProjectId);
 
     log.info({ simulationId, mirofishProjectId }, 'Graph build phase complete');

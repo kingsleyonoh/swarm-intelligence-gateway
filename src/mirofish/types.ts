@@ -7,10 +7,13 @@
 
 // ── API Response Types ──────────────────────────────────────────────────
 
-/** Response from `POST /api/graph/ontology/generate` — returns project ID and task ID for tracking. */
+/**
+ * Response from `POST /api/graph/ontology/generate`.
+ * Ontology generation is synchronous — returns after LLM finishes.
+ * No polling needed.
+ */
 export interface OntologyGenerateResponse {
   project_id: string;
-  task_id: string;
 }
 
 /** Response from `POST /api/graph/build` — returns build status. */

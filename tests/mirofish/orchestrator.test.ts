@@ -178,8 +178,7 @@ function setupSuccessfulDbMocks() {
 
 /** Configure MiroFish client mocks for a fully successful pipeline. */
 function setupSuccessfulMirofishMocks() {
-  mocks.generateOntology.mockResolvedValue({ project_id: 'mf-proj-001', task_id: 'mf-task-001' });
-  mocks.pollOntologyStatus.mockResolvedValue(undefined);
+  mocks.generateOntology.mockResolvedValue({ project_id: 'mf-proj-001' });
   mocks.buildGraph.mockResolvedValue({ status: 'ok' });
   mocks.startSimulation.mockResolvedValue({ simulation_id: 'mf-sim-001' });
   mocks.pollSimulationStatus.mockResolvedValue(undefined);
@@ -241,16 +240,7 @@ describe('runSimulation', () => {
       expect(args[0]).toContain('Middle East Escalation Analysis');
     });
 
-    it('should call pollOntologyStatus after ontology generation', async () => {
-      await runSimulation({
-        scenarioId: 'scenario-001',
-        tenantId: 'tenant-001',
-      });
-
-      expect(mocks.pollOntologyStatus).toHaveBeenCalledWith('mf-task-001', expect.any(Number));
-    });
-
-    it('should call buildGraph after ontology is complete', async () => {
+    it('should call buildGraph after ontology generation (no polling needed)', async () => {
       await runSimulation({
         scenarioId: 'scenario-001',
         tenantId: 'tenant-001',
@@ -300,10 +290,10 @@ describe('runSimulation', () => {
 
   // ── Graph build timeout ──────────────────────────────────────────
 
-  describe('graph build timeout', () => {
-    it('should set status to failed on ontology poll timeout', async () => {
-      mocks.pollOntologyStatus.mockRejectedValue(
-        new Error('Ontology generation timed out after 600000ms'),
+  describe('graph build failure', () => {
+    it('should set status to failed on buildGraph error', async () => {
+      mocks.buildGraph.mockRejectedValue(
+        new Error('Graph build failed: 500'),
       );
 
       await expect(
@@ -311,15 +301,14 @@ describe('runSimulation', () => {
           scenarioId: 'scenario-001',
           tenantId: 'tenant-001',
         }),
-      ).rejects.toThrow(/timed out/i);
+      ).rejects.toThrow(/graph build failed/i);
 
-      // Verify status was set to failed
       expect(mocks.dbUpdate).toHaveBeenCalled();
     });
 
     it('should not proceed to simulation phase on graph build failure', async () => {
-      mocks.pollOntologyStatus.mockRejectedValue(
-        new Error('Ontology generation timed out'),
+      mocks.buildGraph.mockRejectedValue(
+        new Error('Graph build failed'),
       );
 
       await expect(
