@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Swarm Intelligence Gateway</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #0a0a0f;
+        color: #e0e0e0;
+        overflow: hidden;
+      }
+      #app {
+        width: 100vw;
+        height: 100vh;
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        grid-template-rows: 48px 1fr;
+      }
+      #globe-container {
+        grid-column: 1;
+        grid-row: 2;
+        position: relative;
+      }
+      #panel-container {
+        grid-column: 2;
+        grid-row: 1 / -1;
+        overflow-y: auto;
+        border-left: 1px solid #1a1a2e;
+        background: #0f0f1a;
+      }
+      #header {
+        grid-column: 1;
+        grid-row: 1;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        background: #0f0f1a;
+        border-bottom: 1px solid #1a1a2e;
+      }
+      #header h1 {
+        font-size: 16px;
+        font-weight: 600;
+        color: #7aa2f7;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header id="header">
+        <h1>Swarm Intelligence Gateway</h1>
+      </header>
+      <div id="globe-container"></div>
+      <div id="panel-container"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
