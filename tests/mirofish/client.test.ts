@@ -85,8 +85,8 @@ describe('MirofishClient', () => {
   // ── generateOntology ───────────────────────────────────────────────
 
   describe('generateOntology', () => {
-    it('should send POST to /ontology/generate with multipart form data', async () => {
-      const responseBody: OntologyGenerateResponse = { project_id: 'proj-123' };
+    it('should send POST to /api/graph/ontology/generate with multipart form data', async () => {
+      const responseBody: OntologyGenerateResponse = { project_id: 'proj-123', task_id: 'task-123' };
       mocks.request.mockResolvedValue(mockResponse(200, responseBody));
 
       const result = await client.generateOntology(
@@ -95,16 +95,16 @@ describe('MirofishClient', () => {
         'test-project',
       );
 
-      expect(result).toEqual({ project_id: 'proj-123' });
+      expect(result).toEqual({ project_id: 'proj-123', task_id: 'task-123' });
       expect(mocks.request).toHaveBeenCalledTimes(1);
 
       const callArgs = mocks.request.mock.calls[0];
-      expect(callArgs[0]).toBe('http://localhost:5000/ontology/generate');
+      expect(callArgs[0]).toBe('http://localhost:5000/api/graph/ontology/generate');
       expect(callArgs[1].method).toBe('POST');
     });
 
     it('should retry on connection error and succeed on third attempt', async () => {
-      const responseBody: OntologyGenerateResponse = { project_id: 'proj-456' };
+      const responseBody: OntologyGenerateResponse = { project_id: 'proj-456', task_id: 'task-456' };
       mocks.request
         .mockRejectedValueOnce(connectionError())
         .mockRejectedValueOnce(connectionError())
@@ -116,7 +116,7 @@ describe('MirofishClient', () => {
         'project',
       );
 
-      expect(result).toEqual({ project_id: 'proj-456' });
+      expect(result).toEqual({ project_id: 'proj-456', task_id: 'task-456' });
       expect(mocks.request).toHaveBeenCalledTimes(3);
     });
 
@@ -132,14 +132,14 @@ describe('MirofishClient', () => {
     });
 
     it('should retry on timeout error', async () => {
-      const responseBody: OntologyGenerateResponse = { project_id: 'proj-789' };
+      const responseBody: OntologyGenerateResponse = { project_id: 'proj-789', task_id: 'task-789' };
       mocks.request
         .mockRejectedValueOnce(timeoutError())
         .mockResolvedValueOnce(mockResponse(200, responseBody));
 
       const result = await client.generateOntology('seed', 'req', 'proj');
 
-      expect(result).toEqual({ project_id: 'proj-789' });
+      expect(result).toEqual({ project_id: 'proj-789', task_id: 'task-789' });
       expect(mocks.request).toHaveBeenCalledTimes(2);
     });
 
@@ -157,7 +157,7 @@ describe('MirofishClient', () => {
   // ── buildGraph ─────────────────────────────────────────────────────
 
   describe('buildGraph', () => {
-    it('should send POST to /build with project_id', async () => {
+    it('should send POST to /api/graph/build with project_id', async () => {
       const responseBody: BuildResponse = { status: 'ok' };
       mocks.request.mockResolvedValue(mockResponse(200, responseBody));
 
@@ -165,7 +165,7 @@ describe('MirofishClient', () => {
 
       expect(result).toEqual({ status: 'ok' });
       expect(mocks.request).toHaveBeenCalledWith(
-        'http://localhost:5000/build',
+        'http://localhost:5000/api/graph/build',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -192,7 +192,7 @@ describe('MirofishClient', () => {
   // ── startSimulation ────────────────────────────────────────────────
 
   describe('startSimulation', () => {
-    it('should send POST to /simulation/start with config', async () => {
+    it('should send POST to /api/simulation/start with config', async () => {
       const responseBody: SimulationStartResponse = { simulation_id: 'sim-001' };
       mocks.request.mockResolvedValue(mockResponse(200, responseBody));
 
@@ -205,7 +205,7 @@ describe('MirofishClient', () => {
       expect(result).toEqual({ simulation_id: 'sim-001' });
 
       const callArgs = mocks.request.mock.calls[0];
-      expect(callArgs[0]).toBe('http://localhost:5000/simulation/start');
+      expect(callArgs[0]).toBe('http://localhost:5000/api/simulation/start');
       const parsedBody = JSON.parse(callArgs[1].body);
       expect(parsedBody).toEqual({
         project_id: 'proj-123',
@@ -231,7 +231,7 @@ describe('MirofishClient', () => {
         .mockResolvedValueOnce(mockResponse(200, processing))
         .mockResolvedValueOnce(mockResponse(200, complete));
 
-      await client.pollOntologyStatus('proj-123', 60_000);
+      await client.pollOntologyStatus('task-123', 60_000);
 
       expect(mocks.request).toHaveBeenCalledTimes(3);
     });
@@ -244,7 +244,7 @@ describe('MirofishClient', () => {
       mocks.request.mockResolvedValue(mockResponse(200, errorResp));
 
       await expect(
-        client.pollOntologyStatus('proj-123', 60_000),
+        client.pollOntologyStatus('task-123', 60_000),
       ).rejects.toThrow(/Graph build failed/);
     });
 
@@ -254,7 +254,7 @@ describe('MirofishClient', () => {
 
       // Use a very short timeout for test speed
       await expect(
-        client.pollOntologyStatus('proj-123', 100),
+        client.pollOntologyStatus('task-123', 100),
       ).rejects.toThrow(/timed out/i);
     });
   });
@@ -300,19 +300,19 @@ describe('MirofishClient', () => {
   // ── getReport ──────────────────────────────────────────────────────
 
   describe('getReport', () => {
-    it('should send GET to /simulation/report/:projectId', async () => {
+    it('should send GET to /api/report/by-simulation/:simulationId', async () => {
       const responseBody: SimulationReportResponse = {
         report: '## Simulation Report\nPredictions here.',
       };
       mocks.request.mockResolvedValue(mockResponse(200, responseBody));
 
-      const result = await client.getReport('proj-123');
+      const result = await client.getReport('sim-001');
 
       expect(result).toEqual({
         report: '## Simulation Report\nPredictions here.',
       });
       expect(mocks.request).toHaveBeenCalledWith(
-        'http://localhost:5000/simulation/report/proj-123',
+        'http://localhost:5000/api/report/by-simulation/sim-001',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -323,7 +323,7 @@ describe('MirofishClient', () => {
         .mockRejectedValueOnce(connectionError())
         .mockResolvedValueOnce(mockResponse(200, responseBody));
 
-      const result = await client.getReport('proj-123');
+      const result = await client.getReport('sim-001');
 
       expect(result).toEqual({ report: 'Report text' });
       expect(mocks.request).toHaveBeenCalledTimes(2);

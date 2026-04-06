@@ -7,37 +7,39 @@
 
 // ── API Response Types ──────────────────────────────────────────────────
 
-/** Response from `POST /ontology/generate` — returns project ID for tracking. */
+/** Response from `POST /api/graph/ontology/generate` — returns project ID and task ID for tracking. */
 export interface OntologyGenerateResponse {
   project_id: string;
+  task_id: string;
 }
 
-/** Response from `POST /build` — returns build status. */
+/** Response from `POST /api/graph/build` — returns build status. */
 export interface BuildResponse {
   status: string;
 }
 
-/** Response from `POST /simulation/start` — returns simulation ID for polling. */
+/** Response from `POST /api/simulation/start` — returns simulation ID for polling. */
 export interface SimulationStartResponse {
   simulation_id: string;
 }
 
-/** Response from `GET /ontology/status/:projectId` — ontology processing status. */
+/** Response from `GET /api/graph/task/:taskId` — ontology processing status. */
 export interface OntologyStatusResponse {
   status: 'pending' | 'processing' | 'complete' | 'error';
   error?: string;
 }
 
-/** Response from `GET /simulation/status/:simId` — simulation run status. */
+/** Response from `GET /api/simulation/:simId/run-status` — simulation run status. */
 export interface SimulationStatusResponse {
   status: 'running' | 'complete' | 'error';
   progress?: number;
   error?: string;
 }
 
-/** Response from `GET /simulation/report/:projectId` — full report text. */
+/** Response from `GET /api/report/by-simulation/:simulationId` — full report text. */
 export interface SimulationReportResponse {
   report: string;
+  [key: string]: unknown;
 }
 
 // ── Action Log Types ────────────────────────────────────────────────────

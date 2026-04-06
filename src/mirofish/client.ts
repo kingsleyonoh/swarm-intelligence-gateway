@@ -80,8 +80,8 @@ export class MirofishClient {
   /**
    * Upload seed document and generate ontology.
    *
-   * `POST /ontology/generate` — multipart/form-data with seed document
-   * file, simulation requirement text, and project name.
+   * `POST /api/graph/ontology/generate` — multipart/form-data with seed
+   * document file, simulation requirement text, and project name.
    */
   async generateOntology(
     seedDocument: string,
@@ -95,7 +95,7 @@ export class MirofishClient {
     formData.append('project_name', projectName);
 
     return this.requestWithRetry<OntologyGenerateResponse>(
-      `${this.baseUrl}/ontology/generate`,
+      `${this.baseUrl}/api/graph/ontology/generate`,
       { method: 'POST', body: formData },
     );
   }
@@ -103,25 +103,25 @@ export class MirofishClient {
   /**
    * Poll ontology status until complete or timeout.
    *
-   * `GET /ontology/status/:projectId` — polls every 5 seconds.
+   * `GET /api/graph/task/:taskId` — polls every 5 seconds.
    *
-   * @param projectId - MiroFish project ID
+   * @param taskId - MiroFish task ID returned by generateOntology
    * @param timeoutMs - Maximum wait time (default 10 minutes)
    */
   async pollOntologyStatus(
-    projectId: string,
+    taskId: string,
     timeoutMs: number = 600_000,
   ): Promise<void> {
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {
       const status = await this.requestWithRetry<OntologyStatusResponse>(
-        `${this.baseUrl}/ontology/status/${projectId}`,
+        `${this.baseUrl}/api/graph/task/${taskId}`,
         { method: 'GET' },
       );
 
       if (status.status === 'complete') {
-        log.info({ projectId }, 'Ontology generation complete');
+        log.info({ taskId }, 'Ontology generation complete');
         return;
       }
 
@@ -131,23 +131,23 @@ export class MirofishClient {
         );
       }
 
-      log.debug({ projectId, status: status.status }, 'Ontology still processing');
+      log.debug({ taskId, status: status.status }, 'Ontology still processing');
       await sleep(this.ontologyPollIntervalMs);
     }
 
     throw new Error(
-      `Ontology generation timed out after ${timeoutMs}ms for project ${projectId}`,
+      `Ontology generation timed out after ${timeoutMs}ms for task ${taskId}`,
     );
   }
 
   /**
    * Build the knowledge graph from the generated ontology.
    *
-   * `POST /build` — JSON `{ project_id }`.
+   * `POST /api/graph/build` — JSON `{ project_id }`.
    */
   async buildGraph(projectId: string): Promise<BuildResponse> {
     return this.requestWithRetry<BuildResponse>(
-      `${this.baseUrl}/build`,
+      `${this.baseUrl}/api/graph/build`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -159,14 +159,14 @@ export class MirofishClient {
   /**
    * Start a swarm simulation.
    *
-   * `POST /simulation/start` — JSON `{ project_id, config }`.
+   * `POST /api/simulation/start` — JSON `{ project_id, config }`.
    */
   async startSimulation(
     projectId: string,
     config: MirofishConfig,
   ): Promise<SimulationStartResponse> {
     return this.requestWithRetry<SimulationStartResponse>(
-      `${this.baseUrl}/simulation/start`,
+      `${this.baseUrl}/api/simulation/start`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -178,7 +178,7 @@ export class MirofishClient {
   /**
    * Poll simulation status until complete or timeout.
    *
-   * `GET /simulation/status/:simId` — polls every 10 seconds.
+   * `GET /api/simulation/:simId/run-status` — polls every 10 seconds.
    *
    * @param simId - MiroFish simulation ID
    * @param timeoutMs - Maximum wait time (default 30 minutes)
@@ -191,7 +191,7 @@ export class MirofishClient {
 
     while (Date.now() < deadline) {
       const status = await this.requestWithRetry<SimulationStatusResponse>(
-        `${this.baseUrl}/simulation/status/${simId}`,
+        `${this.baseUrl}/api/simulation/${simId}/run-status`,
         { method: 'GET' },
       );
 
@@ -218,11 +218,11 @@ export class MirofishClient {
   /**
    * Retrieve the simulation report.
    *
-   * `GET /simulation/report/:projectId`
+   * `GET /api/report/by-simulation/:simulationId`
    */
-  async getReport(projectId: string): Promise<SimulationReportResponse> {
+  async getReport(simulationId: string): Promise<SimulationReportResponse> {
     return this.requestWithRetry<SimulationReportResponse>(
-      `${this.baseUrl}/simulation/report/${projectId}`,
+      `${this.baseUrl}/api/report/by-simulation/${simulationId}`,
       { method: 'GET' },
     );
   }

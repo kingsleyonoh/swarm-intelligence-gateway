@@ -178,7 +178,7 @@ function setupSuccessfulDbMocks() {
 
 /** Configure MiroFish client mocks for a fully successful pipeline. */
 function setupSuccessfulMirofishMocks() {
-  mocks.generateOntology.mockResolvedValue({ project_id: 'mf-proj-001' });
+  mocks.generateOntology.mockResolvedValue({ project_id: 'mf-proj-001', task_id: 'mf-task-001' });
   mocks.pollOntologyStatus.mockResolvedValue(undefined);
   mocks.buildGraph.mockResolvedValue({ status: 'ok' });
   mocks.startSimulation.mockResolvedValue({ simulation_id: 'mf-sim-001' });
@@ -247,7 +247,7 @@ describe('runSimulation', () => {
         tenantId: 'tenant-001',
       });
 
-      expect(mocks.pollOntologyStatus).toHaveBeenCalledWith('mf-proj-001', expect.any(Number));
+      expect(mocks.pollOntologyStatus).toHaveBeenCalledWith('mf-task-001', expect.any(Number));
     });
 
     it('should call buildGraph after ontology is complete', async () => {
@@ -282,7 +282,7 @@ describe('runSimulation', () => {
         tenantId: 'tenant-001',
       });
 
-      expect(mocks.getReport).toHaveBeenCalledWith('mf-proj-001');
+      expect(mocks.getReport).toHaveBeenCalledWith('mf-sim-001');
     });
 
     it('should update simulation status through the pipeline phases', async () => {

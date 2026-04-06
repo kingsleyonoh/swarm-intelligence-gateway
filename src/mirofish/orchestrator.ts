@@ -218,7 +218,7 @@ export async function runSimulation(
       seedDocument: seedMarkdown,
     });
 
-    const { project_id: mirofishProjectId } = await mirofishClient.generateOntology(
+    const { project_id: mirofishProjectId, task_id: taskId } = await mirofishClient.generateOntology(
       seedMarkdown,
       scenario.simulationRequirement,
       `sim-${simulationId}`,
@@ -229,7 +229,7 @@ export async function runSimulation(
       mirofishProjectId,
     });
 
-    await mirofishClient.pollOntologyStatus(mirofishProjectId, ONTOLOGY_TIMEOUT_MS);
+    await mirofishClient.pollOntologyStatus(taskId, ONTOLOGY_TIMEOUT_MS);
     await mirofishClient.buildGraph(mirofishProjectId);
 
     log.info({ simulationId, mirofishProjectId }, 'Graph build phase complete');
@@ -251,7 +251,7 @@ export async function runSimulation(
 
     await updateSimulationStatus(simulationId, SIMULATION_STATUS.REPORTING);
 
-    const { report } = await mirofishClient.getReport(mirofishProjectId);
+    const { report } = await mirofishClient.getReport(mirofishSimId);
 
     // Parse predictions from the report text
     const extractedPredictions = parsePredictions(report);
