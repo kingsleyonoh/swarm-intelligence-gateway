@@ -57,6 +57,14 @@ layerRegistry.register(
 // Phase 3-4: Load variant config and resolve
 const { panels, layers } = variantLoader.load(swarmVariant);
 
+// Panel descriptions for user context
+const PANEL_DESCRIPTIONS: Record<string, string> = {
+  'swarm-theater': 'Active simulation theaters. Each card shows a region being analyzed by 4,096 AI agents. Click a card for agent debate details.',
+  'faction-map': 'How factions relate to each other. Node size = influence, color = stance (red = escalation, blue = de-escalation, yellow = uncertain).',
+  'prediction-timeline': 'Prediction confidence over time. Each dot is a prediction colored by type. Lines connect predictions for the same theater.',
+  'consensus-heatmap': 'Controls for the globe heatmap overlay. Adjust intensity threshold to filter predictions by confidence level.',
+};
+
 // Phase 5: Mount panels into the panel container
 const panelContainer = document.getElementById('panel-container');
 if (panelContainer) {
@@ -68,6 +76,14 @@ if (panelContainer) {
     const header = document.createElement('h2');
     header.textContent = panel.title;
     section.appendChild(header);
+
+    const desc = PANEL_DESCRIPTIONS[panel.id];
+    if (desc) {
+      const subtitle = document.createElement('p');
+      subtitle.className = 'panel-description';
+      subtitle.textContent = desc;
+      section.appendChild(subtitle);
+    }
 
     const content = document.createElement('div');
     content.classList.add('panel-content');

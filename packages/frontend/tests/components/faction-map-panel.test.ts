@@ -79,7 +79,7 @@ describe('FactionMapPanel', () => {
       panel.mount(container);
       const svg = container.querySelector('svg') as SVGSVGElement;
       expect(svg.getAttribute('width')).toBe('100%');
-      expect(svg.getAttribute('height')).toBe('100%');
+      expect(svg.getAttribute('viewBox')).toBeTruthy();
     });
   });
 
@@ -102,7 +102,7 @@ describe('FactionMapPanel', () => {
       // Smallest faction (30 members) should have smallest radius
       expect(Math.max(...radii)).toBeGreaterThanOrEqual(10);
       expect(Math.min(...radii)).toBeGreaterThanOrEqual(10);
-      expect(Math.max(...radii)).toBeLessThanOrEqual(40);
+      expect(Math.max(...radii)).toBeLessThanOrEqual(45);
     });
 
     it('nodes are colored by stance', () => {

@@ -27,11 +27,13 @@ interface SimEdge {
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const MIN_RADIUS = 10;
-const MAX_RADIUS = 40;
+const VIEW_W = 600;
+const VIEW_H = 400;
+const MIN_RADIUS = 14;
+const MAX_RADIUS = 45;
 const MIN_STROKE = 1;
 const MAX_STROKE = 4;
-const EDGE_COLOR = 'rgba(255,255,255,0.3)';
+const EDGE_COLOR = 'rgba(255,255,255,0.2)';
 
 export class FactionMapPanel implements Panel {
   readonly id = 'faction-map';
@@ -51,9 +53,10 @@ export class FactionMapPanel implements Panel {
     this.container = container;
 
     this.svgEl = document.createElementNS(SVG_NS, 'svg');
+    this.svgEl.setAttribute('viewBox', `0 0 ${VIEW_W} ${VIEW_H}`);
     this.svgEl.setAttribute('width', '100%');
-    this.svgEl.setAttribute('height', '100%');
     this.svgEl.setAttribute('class', 'faction-map-svg');
+    this.svgEl.style.display = 'block';
 
     this.edgeGroup = document.createElementNS(SVG_NS, 'g');
     this.edgeGroup.setAttribute('class', 'edges');
@@ -104,19 +107,18 @@ export class FactionMapPanel implements Panel {
   }
 
   private buildSimData(data: FactionGraphData): void {
-    const width = this.container?.clientWidth ?? 800;
-    const height = this.container?.clientHeight ?? 600;
-    const cx = width / 2;
-    const cy = height / 2;
+    const cx = VIEW_W / 2;
+    const cy = VIEW_H / 2;
+    const layoutRadius = Math.min(VIEW_W, VIEW_H) * 0.32;
 
-    // Create sim nodes with initial positions
+    // Create sim nodes arranged in a circle within the viewBox
     const nodeMap = new Map<string, SimNode>();
     this.simNodes = data.nodes.map((n, i) => {
-      const angle = (2 * Math.PI * i) / Math.max(data.nodes.length, 1);
+      const angle = (2 * Math.PI * i) / Math.max(data.nodes.length, 1) - Math.PI / 2;
       const simNode: SimNode = {
         ...n,
-        x: cx + Math.cos(angle) * 100,
-        y: cy + Math.sin(angle) * 100,
+        x: cx + Math.cos(angle) * layoutRadius,
+        y: cy + Math.sin(angle) * layoutRadius,
       };
       nodeMap.set(n.id, simNode);
       return simNode;
@@ -192,14 +194,19 @@ export class FactionMapPanel implements Panel {
     if (!this.labelGroup) return;
     this.labelGroup.innerHTML = '';
 
+    const memberCounts = this.simNodes.map((n) => n.memberCount);
+    const minCount = Math.min(...memberCounts, 0);
+    const maxCount = Math.max(...memberCounts, 1);
+
     for (const node of this.simNodes) {
+      const r = this.scaleRadius(node.memberCount, minCount, maxCount);
       const text = document.createElementNS(SVG_NS, 'text');
       text.setAttribute('class', 'faction-label');
       text.setAttribute('x', String(node.x));
-      text.setAttribute('y', String(node.y + MAX_RADIUS + 14));
+      text.setAttribute('y', String(node.y + r + 16));
       text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('fill', '#ccc');
-      text.setAttribute('font-size', '12');
+      text.setAttribute('fill', '#aaa');
+      text.setAttribute('font-size', '11');
       text.textContent = node.name;
       this.labelGroup.appendChild(text);
     }

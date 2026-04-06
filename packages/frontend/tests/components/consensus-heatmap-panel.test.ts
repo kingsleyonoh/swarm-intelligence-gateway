@@ -53,8 +53,8 @@ describe('ConsensusHeatmapPanel', () => {
 
     it('legend has gradient labels (Low, Medium, High)', () => {
       panel.mount(container);
-      const legend = container.querySelector('.heatmap-legend');
-      const text = legend?.textContent ?? '';
+      const wrapper = container.querySelector('.heatmap-legend-wrapper');
+      const text = wrapper?.textContent ?? '';
       expect(text).toContain('Low');
       expect(text).toContain('High');
     });
@@ -122,7 +122,7 @@ describe('ConsensusHeatmapPanel', () => {
       slider.value = '0.6';
       slider.dispatchEvent(new Event('input', { bubbles: true }));
 
-      const label = container.querySelector('.heatmap-threshold-value');
+      const label = container.querySelector('.threshold-value');
       expect(label?.textContent).toContain('0.6');
     });
   });

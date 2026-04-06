@@ -27,11 +27,14 @@ export class ConsensusHeatmapPanel implements Panel {
 
   mount(container: HTMLElement): void {
     this.container = container;
-    container.appendChild(this.buildToggle());
-    container.appendChild(this.buildSlider());
-    container.appendChild(this.buildLegend());
+    const controls = document.createElement('div');
+    controls.className = 'heatmap-controls';
+    controls.appendChild(this.buildToggle());
+    controls.appendChild(this.buildSlider());
+    controls.appendChild(this.buildLegend());
     this.statusEl = this.buildStatus();
-    container.appendChild(this.statusEl);
+    controls.appendChild(this.statusEl);
+    container.appendChild(controls);
   }
 
   unmount(): void {
@@ -68,10 +71,10 @@ export class ConsensusHeatmapPanel implements Panel {
 
   private buildSlider(): HTMLElement {
     const wrapper = document.createElement('div');
-    wrapper.className = 'heatmap-slider-wrapper';
+    wrapper.className = 'heatmap-slider-row';
 
     const label = document.createElement('label');
-    label.textContent = 'Intensity Threshold: ';
+    label.textContent = 'Intensity Threshold:';
     wrapper.appendChild(label);
 
     const slider = document.createElement('input');
@@ -84,7 +87,7 @@ export class ConsensusHeatmapPanel implements Panel {
     wrapper.appendChild(slider);
 
     this.thresholdLabel = document.createElement('span');
-    this.thresholdLabel.className = 'heatmap-threshold-value';
+    this.thresholdLabel.className = 'threshold-value';
     this.thresholdLabel.textContent = String(this.threshold);
     wrapper.appendChild(this.thresholdLabel);
 
@@ -101,20 +104,14 @@ export class ConsensusHeatmapPanel implements Panel {
 
   private buildLegend(): HTMLElement {
     const legend = document.createElement('div');
-    legend.className = 'heatmap-legend';
+    legend.className = 'heatmap-legend-wrapper';
 
     const bar = document.createElement('div');
-    bar.className = 'heatmap-legend-bar';
-    bar.style.height = '12px';
-    bar.style.background =
-      'linear-gradient(to right, #27ae60, #f1c40f, #e74c3c)';
-    bar.style.borderRadius = '4px';
+    bar.className = 'heatmap-legend';
     legend.appendChild(bar);
 
     const labels = document.createElement('div');
     labels.className = 'heatmap-legend-labels';
-    labels.style.display = 'flex';
-    labels.style.justifyContent = 'space-between';
 
     const low = document.createElement('span');
     low.textContent = 'Low';

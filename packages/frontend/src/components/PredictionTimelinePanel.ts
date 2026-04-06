@@ -39,6 +39,25 @@ export class PredictionTimelinePanel implements Panel {
   mount(container: HTMLElement): void {
     this.container = container;
 
+    // Color legend
+    const legend = document.createElement('div');
+    legend.className = 'color-legend';
+    const types: Array<[string, string]> = [
+      ['Escalation', '#e05252'], ['De-escalation', '#4a90d9'],
+      ['Market Shift', '#d4a843'], ['Sentiment Cascade', '#9b59b6'],
+    ];
+    for (const [label, color] of types) {
+      const item = document.createElement('span');
+      item.className = 'color-legend-item';
+      const dot = document.createElement('span');
+      dot.className = 'color-legend-dot';
+      dot.style.backgroundColor = color;
+      item.appendChild(dot);
+      item.appendChild(document.createTextNode(label));
+      legend.appendChild(item);
+    }
+    container.appendChild(legend);
+
     this.svgEl = document.createElementNS(SVG_NS, 'svg');
     this.svgEl.setAttribute(
       'viewBox',
@@ -89,22 +108,38 @@ export class PredictionTimelinePanel implements Panel {
     }
 
     this.removeEmpty();
+    this.renderDateTicks();
     this.renderTheaterLines();
     this.renderDots();
   }
 
   private renderAxes(): void {
-    if (!this.svgEl) return;
+    if (!this.svgEl || !this.plotGroup) return;
 
-    // X-axis label
-    const xLabel = document.createElementNS(SVG_NS, 'text');
-    xLabel.setAttribute('x', String(CHART_WIDTH / 2));
-    xLabel.setAttribute('y', String(CHART_HEIGHT - 5));
-    xLabel.setAttribute('text-anchor', 'middle');
-    xLabel.setAttribute('fill', '#aaa');
-    xLabel.setAttribute('font-size', '12');
-    xLabel.textContent = 'Time';
-    this.svgEl.appendChild(xLabel);
+    // Horizontal gridlines + Y-axis ticks
+    for (const val of [0, 0.25, 0.5, 0.75, 1]) {
+      const y = PLOT_H - val * PLOT_H;
+
+      // Gridline
+      const gridline = document.createElementNS(SVG_NS, 'line');
+      gridline.setAttribute('x1', '0');
+      gridline.setAttribute('y1', String(y));
+      gridline.setAttribute('x2', String(PLOT_W));
+      gridline.setAttribute('y2', String(y));
+      gridline.setAttribute('stroke', '#1e1e35');
+      gridline.setAttribute('stroke-width', '1');
+      this.plotGroup.appendChild(gridline);
+
+      // Tick label
+      const tick = document.createElementNS(SVG_NS, 'text');
+      tick.setAttribute('x', '-8');
+      tick.setAttribute('y', String(y + 4));
+      tick.setAttribute('text-anchor', 'end');
+      tick.setAttribute('fill', '#666');
+      tick.setAttribute('font-size', '11');
+      tick.textContent = val.toFixed(val % 0.5 === 0 ? 1 : 2);
+      this.plotGroup.appendChild(tick);
+    }
 
     // Y-axis label
     const yLabel = document.createElementNS(SVG_NS, 'text');
@@ -112,22 +147,47 @@ export class PredictionTimelinePanel implements Panel {
     yLabel.setAttribute('y', '14');
     yLabel.setAttribute('text-anchor', 'middle');
     yLabel.setAttribute('transform', 'rotate(-90)');
-    yLabel.setAttribute('fill', '#aaa');
-    yLabel.setAttribute('font-size', '12');
+    yLabel.setAttribute('fill', '#666');
+    yLabel.setAttribute('font-size', '11');
     yLabel.textContent = 'Confidence';
     this.svgEl.appendChild(yLabel);
 
-    // Y-axis ticks (0, 0.5, 1)
+    // X-axis date ticks (rendered after update when we know the time range)
+    // Static "Time" label as fallback
+    const xLabel = document.createElementNS(SVG_NS, 'text');
+    xLabel.setAttribute('class', 'x-axis-label');
+    xLabel.setAttribute('x', String(CHART_WIDTH / 2));
+    xLabel.setAttribute('y', String(CHART_HEIGHT - 4));
+    xLabel.setAttribute('text-anchor', 'middle');
+    xLabel.setAttribute('fill', '#666');
+    xLabel.setAttribute('font-size', '11');
+    xLabel.textContent = 'Time';
+    this.svgEl.appendChild(xLabel);
+  }
+
+  private renderDateTicks(): void {
     if (!this.plotGroup) return;
-    for (const val of [0, 0.5, 1]) {
-      const y = PLOT_H - val * PLOT_H;
+    // Remove old date ticks
+    this.plotGroup.querySelectorAll('.date-tick').forEach((el) => el.remove());
+
+    const { minTime, maxTime } = this.getTimeRange();
+    const tickCount = 5;
+    const step = (maxTime - minTime) / tickCount;
+
+    for (let i = 0; i <= tickCount; i++) {
+      const t = minTime + step * i;
+      const x = (i / tickCount) * PLOT_W;
+      const date = new Date(t);
+      const label = `${date.getMonth() + 1}/${date.getDate()}`;
+
       const tick = document.createElementNS(SVG_NS, 'text');
-      tick.setAttribute('x', '-8');
-      tick.setAttribute('y', String(y + 4));
-      tick.setAttribute('text-anchor', 'end');
-      tick.setAttribute('fill', '#888');
+      tick.setAttribute('class', 'date-tick');
+      tick.setAttribute('x', String(x));
+      tick.setAttribute('y', String(PLOT_H + 20));
+      tick.setAttribute('text-anchor', 'middle');
+      tick.setAttribute('fill', '#666');
       tick.setAttribute('font-size', '10');
-      tick.textContent = String(val);
+      tick.textContent = label;
       this.plotGroup.appendChild(tick);
     }
   }

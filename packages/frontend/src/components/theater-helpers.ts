@@ -85,10 +85,6 @@ export function createFactionSplitBar(
 ): HTMLElement {
   const bar = document.createElement('div');
   bar.className = 'faction-split-bar';
-  bar.style.display = 'flex';
-  bar.style.height = '8px';
-  bar.style.borderRadius = '4px';
-  bar.style.overflow = 'hidden';
 
   for (const seg of segments) {
     const span = document.createElement('span');
@@ -112,10 +108,6 @@ export function createDebatePostEl(post: AgentDebatePost): HTMLElement {
 
   const dot = document.createElement('span');
   dot.className = 'faction-dot';
-  dot.style.display = 'inline-block';
-  dot.style.width = '8px';
-  dot.style.height = '8px';
-  dot.style.borderRadius = '50%';
   dot.style.backgroundColor = post.stanceColor;
   header.appendChild(dot);
 
