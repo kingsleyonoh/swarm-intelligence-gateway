@@ -1,0 +1,226 @@
+/**
+ * SwarmTheaterPanel — Hero panel displaying theater simulation cards.
+ *
+ * CSS Grid of theater cards with domain filtering and expandable
+ * agent debate feed. Each card shows theater name, agent count,
+ * round progress, top prediction, confidence gauge, and faction bar.
+ */
+
+import type { Panel } from '../types.js';
+import type { TheaterCardData, TheaterDomain } from './theater-types.js';
+import { THEATER_DOMAINS } from './theater-types.js';
+import {
+  createConfidenceGauge,
+  createFactionSplitBar,
+  createDebateFeed,
+} from './theater-helpers.js';
+
+export class SwarmTheaterPanel implements Panel {
+  readonly id = 'swarm-theater';
+  readonly title = 'Swarm Theater';
+
+  private container: HTMLElement | null = null;
+  private gridEl: HTMLElement | null = null;
+  private filterBarEl: HTMLElement | null = null;
+  private cards: TheaterCardData[] = [];
+  private activeFilter: 'all' | TheaterDomain = 'all';
+  private expandedCardId: string | null = null;
+
+  mount(container: HTMLElement): void {
+    this.container = container;
+    this.filterBarEl = this.buildFilterBar();
+    container.appendChild(this.filterBarEl);
+    this.gridEl = this.buildGrid();
+    container.appendChild(this.gridEl);
+  }
+
+  unmount(): void {
+    if (this.container) {
+      this.container.innerHTML = '';
+    }
+    this.container = null;
+    this.gridEl = null;
+    this.filterBarEl = null;
+    this.expandedCardId = null;
+  }
+
+  update(data: unknown): void {
+    if (!Array.isArray(data)) return;
+    this.cards = data as TheaterCardData[];
+    this.expandedCardId = null;
+    this.renderCards();
+  }
+
+  private buildFilterBar(): HTMLElement {
+    const bar = document.createElement('div');
+    bar.className = 'theater-filter-bar';
+
+    for (const domain of THEATER_DOMAINS) {
+      const btn = document.createElement('button');
+      btn.textContent = domain;
+      btn.dataset.domain = domain;
+      if (domain === 'all') btn.classList.add('active');
+      btn.addEventListener('click', () => this.handleFilter(domain));
+      bar.appendChild(btn);
+    }
+
+    return bar;
+  }
+
+  private buildGrid(): HTMLElement {
+    const grid = document.createElement('div');
+    grid.className = 'theater-grid';
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(200px, 1fr))';
+    grid.style.gap = '16px';
+    return grid;
+  }
+
+  private handleFilter(domain: 'all' | TheaterDomain): void {
+    this.activeFilter = domain;
+    this.updateFilterButtonStyles();
+    this.applyFilter();
+  }
+
+  private updateFilterButtonStyles(): void {
+    if (!this.filterBarEl) return;
+    const buttons = this.filterBarEl.querySelectorAll('button');
+    for (const btn of buttons) {
+      btn.classList.toggle(
+        'active',
+        btn.dataset.domain === this.activeFilter,
+      );
+    }
+  }
+
+  private applyFilter(): void {
+    if (!this.gridEl) return;
+    const cards = this.gridEl.querySelectorAll('.theater-card');
+    for (const card of cards) {
+      const el = card as HTMLElement;
+      if (this.activeFilter === 'all' || el.dataset.domain === this.activeFilter) {
+        el.removeAttribute('hidden');
+      } else {
+        el.setAttribute('hidden', '');
+      }
+    }
+  }
+
+  private renderCards(): void {
+    if (!this.gridEl || !this.container) return;
+
+    // If expanded, show debate feed instead
+    if (this.expandedCardId) {
+      this.showDebateFeed();
+      return;
+    }
+
+    // Ensure grid is visible
+    this.showGridView();
+
+    this.gridEl.innerHTML = '';
+
+    if (this.cards.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'theater-empty';
+      empty.textContent = 'No active simulations';
+      this.gridEl.appendChild(empty);
+      return;
+    }
+
+    for (const cardData of this.cards) {
+      this.gridEl.appendChild(this.buildCard(cardData));
+    }
+
+    this.applyFilter();
+  }
+
+  private buildCard(data: TheaterCardData): HTMLElement {
+    const card = document.createElement('div');
+    card.className = 'theater-card';
+    card.dataset.domain = data.domain;
+    card.dataset.cardId = data.id;
+
+    const name = document.createElement('h3');
+    name.textContent = data.theater;
+    card.appendChild(name);
+
+    const badge = document.createElement('span');
+    badge.className = 'agent-count-badge';
+    badge.textContent = String(data.agentCount);
+    card.appendChild(badge);
+
+    card.appendChild(this.buildProgressBar(data));
+
+    const pred = document.createElement('p');
+    pred.className = 'top-prediction';
+    pred.textContent = data.topPrediction;
+    card.appendChild(pred);
+
+    card.appendChild(createConfidenceGauge(data.confidence));
+    card.appendChild(createFactionSplitBar(data.factionSplit));
+
+    card.addEventListener('click', () => this.expandCard(data.id));
+
+    return card;
+  }
+
+  private buildProgressBar(data: TheaterCardData): HTMLElement {
+    const bar = document.createElement('div');
+    bar.className = 'round-progress-bar';
+
+    const fill = document.createElement('div');
+    fill.className = 'round-progress-fill';
+    const pct =
+      data.totalRounds > 0
+        ? Math.round((data.currentRound / data.totalRounds) * 100)
+        : 0;
+    fill.style.width = `${pct}%`;
+    fill.style.transition = 'width 0.5s ease';
+    bar.appendChild(fill);
+
+    return bar;
+  }
+
+  private expandCard(cardId: string): void {
+    this.expandedCardId = cardId;
+    this.showDebateFeed();
+  }
+
+  private showDebateFeed(): void {
+    if (!this.container) return;
+    const cardData = this.cards.find((c) => c.id === this.expandedCardId);
+    if (!cardData) return;
+
+    // Hide grid and filter bar
+    if (this.gridEl) this.gridEl.style.display = 'none';
+    if (this.filterBarEl) this.filterBarEl.style.display = 'none';
+
+    // Remove any existing feed
+    const existing = this.container.querySelector('.debate-feed');
+    if (existing) existing.remove();
+
+    const feed = createDebateFeed(cardData.agentDebate, () => {
+      this.expandedCardId = null;
+      this.showGridView();
+    });
+
+    this.container.appendChild(feed);
+  }
+
+  private showGridView(): void {
+    if (!this.container) return;
+
+    // Remove debate feed
+    const feed = this.container.querySelector('.debate-feed');
+    if (feed) feed.remove();
+
+    // Restore grid and filter bar
+    if (this.gridEl) {
+      this.gridEl.style.display = 'grid';
+      this.gridEl.style.gridTemplateColumns =
+        'repeat(auto-fill, minmax(200px, 1fr))';
+    }
+    if (this.filterBarEl) this.filterBarEl.style.display = '';
+  }
+}

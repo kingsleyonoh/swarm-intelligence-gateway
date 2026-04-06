@@ -19,6 +19,8 @@ import { PanelRegistry } from './core/panel-registry.js';
 import { LayerRegistry } from './core/layer-registry.js';
 import { VariantLoader } from './core/variant-loader.js';
 import { swarmVariant } from './config/variants/swarm.js';
+import { SwarmTheaterPanel } from './components/SwarmTheaterPanel.js';
+import { FactionMapPanel } from './components/FactionMapPanel.js';
 
 // Phase 1: Initialize registries
 const panelRegistry = new PanelRegistry();
@@ -26,10 +28,8 @@ const layerRegistry = new LayerRegistry();
 const variantLoader = new VariantLoader(panelRegistry, layerRegistry);
 
 // Phase 2: Register panels and layers
-// (Panel/layer constructors will be registered here as they are implemented)
-// Example:
-//   panelRegistry.register('swarm-theater', SwarmTheaterPanel);
-//   layerRegistry.register('swarm-predictions', SwarmPredictionsLayer);
+panelRegistry.register('swarm-theater', SwarmTheaterPanel);
+panelRegistry.register('faction-map', FactionMapPanel);
 
 // Phase 3-4: Load variant config and resolve
 const { panels, layers } = variantLoader.load(swarmVariant);
