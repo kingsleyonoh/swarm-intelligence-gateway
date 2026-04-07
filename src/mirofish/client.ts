@@ -377,9 +377,9 @@ export class MirofishClient {
       { method: 'GET' },
     );
 
-    // Extract report text from nested data
+    // Extract report text — MiroFish uses `markdown_content` field
     const data = (response.data ?? response) as Record<string, unknown>;
-    const report = (data.content as string) ?? (data.report as string) ?? JSON.stringify(data);
+    const report = (data.markdown_content as string) ?? (data.content as string) ?? (data.report as string) ?? JSON.stringify(data);
     return { report };
   }
 
