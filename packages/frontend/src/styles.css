@@ -457,19 +457,19 @@ body::before {
 
 .report-content p {
   font-family: var(--font-body);
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text-body);
   line-height: 1.85;
-  margin: 12px 0;
+  margin: 14px 0;
   max-width: 70ch;
 }
 
 .report-content .report-executive-summary {
   border-left: 4px solid var(--ink);
   margin: 0 0 24px;
-  padding: 16px 22px;
+  padding: 18px 24px;
   background: var(--ink-bg);
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text-body);
   font-style: italic;
   font-family: var(--font-display);
@@ -483,9 +483,9 @@ body::before {
 .report-content .report-evidence {
   border-left: 3px solid var(--sienna);
   margin: 14px 0;
-  padding: 10px 18px 10px 16px;
+  padding: 12px 20px 12px 18px;
   background: var(--sienna-light);
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--text-secondary);
   font-style: italic;
   font-family: var(--font-display);
@@ -590,7 +590,7 @@ body::before {
 }
 
 .report-pred-summary {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-body);
   line-height: 1.65;
   margin: 0;
