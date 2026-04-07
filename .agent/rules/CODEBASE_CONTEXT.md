@@ -192,6 +192,12 @@ index.ts
 | 2026-04-06 | MiroFish | 4.3GB Docker image — fails on slow connections, no partial resume. Source install needs Python <3.12 | Phase 6 MiroFish setup |
 | 2026-04-06 | WorldMonitor | Seeders use Redis lock acquisition that fails with local REST proxy — 72/95 seeders skip | Phase 6 seeder run |
 | 2026-04-06 | BullMQ | Simulation route creates record (pending) then orchestrator tried to create again → ConflictError | Phase 6 E2E run 2 |
+| 2026-04-07 | WorldMonitor | Seeders use `localhost` which resolves to IPv6 (::1) on Windows — Redis REST proxy only listens on IPv4 (127.0.0.1). Use explicit `127.0.0.1` | Phase 6 seeder debugging |
+| 2026-04-07 | WorldMonitor | `_isDirectRun` check fails when path contains spaces — `import.meta.url` URL-encodes spaces but `process.argv[1]` doesn't | Phase 6 forecast seeder |
+| 2026-04-07 | WorldMonitor | Forecast seeder hardcodes `providerOrder=groq,openrouter` — ignores `LLM_API_URL`/`LLM_API_KEY` env vars | Phase 6 DeepSeek attempt |
+| 2026-04-07 | Docker | OOM kill (exit code -9) when too many containers run simultaneously — stop non-essential containers before heavy simulations | Phase 6 English simulation |
+| 2026-04-07 | Vite | Dev proxy uses `localhost` which resolves to IPv6 on Windows — use `127.0.0.1` in vite.config.ts proxy target | Phase 6 frontend wiring |
+| 2026-04-07 | Frontend | DataBridge polls simulations (30s) and predictions (60s) separately — predictions cache empty on first simulation render, causing missing theater names | Phase 6 frontend wiring |
 
 ## Shared Foundation (MUST READ before any implementation)
 
