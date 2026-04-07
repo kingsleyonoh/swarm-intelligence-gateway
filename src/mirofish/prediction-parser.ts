@@ -2,14 +2,14 @@
  * Prediction Parser.
  *
  * Extracts structured predictions from MiroFish simulation report text.
- * Uses pattern matching to find prediction blocks with theater, type,
- * summary, confidence, time horizon, and faction data.
  *
- * Policy:
- * - Missing required fields → block is skipped and logged
- * - Confidence out of [0, 1] → clamped to the range
- * - Non-numeric confidence → block is skipped and logged
- * - Unknown prediction_type (not one of the canonical four) → skipped
+ * Supports TWO formats:
+ * 1. Structured blocks: `**Prediction N:**` with labeled fields (original)
+ * 2. Narrative sections: `## Section Heading` with prose content (MiroFish actual output)
+ *
+ * The narrative parser infers prediction type from section keywords,
+ * extracts the theater from the report title, and uses the first
+ * paragraph as the prediction summary.
  */
 
 import { PREDICTION_TYPE } from '../config/constants.js';
@@ -34,18 +34,107 @@ const VALID_PREDICTION_TYPES: ReadonlySet<string> = new Set<string>(
   Object.values(PREDICTION_TYPE),
 );
 
+// ── Keyword → Type Mapping ────────────────────────────────────────────
+
+const TYPE_KEYWORDS: Array<[RegExp, string]> = [
+  // Order matters — more specific matches first
+  [/de-escalat|diplomati|peace|negotiat|ceasefire|withdraw|restraint|realignment/i, PREDICTION_TYPE.DE_ESCALATION],
+  [/market|economic|oil|price|trade|financ|commodit|volatil|invest|currency/i, PREDICTION_TYPE.MARKET_SHIFT],
+  [/sentiment|public|opinion|media|narrative|perception|information|social/i, PREDICTION_TYPE.SENTIMENT_CASCADE],
+  [/escalat|military|conflict|confront|war|weapon|attack|naval|crisis|trend|risk/i, PREDICTION_TYPE.ESCALATION],
+];
+
+function inferPredictionType(heading: string, content: string): string {
+  const text = `${heading} ${content.slice(0, 500)}`;
+  for (const [pattern, type] of TYPE_KEYWORDS) {
+    if (pattern.test(text)) return type;
+  }
+  return PREDICTION_TYPE.ESCALATION; // default
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────
 
-/**
- * Extract a field value from a line matching `- Label: value` or
- * `- **Label:** value`. Returns the trimmed value, or undefined if the
- * line is absent. Lines that declare the label with an empty value
- * (e.g. `- Supporting Factions:`) return an empty string.
- */
+function extractTheater(reportText: string): string {
+  // Known theater names (ordered by specificity)
+  const knownTheaters = [
+    'Strait of Hormuz', 'Persian Gulf', 'South China Sea', 'Eastern Mediterranean',
+    'Middle East', 'Eastern Europe', 'West Africa', 'Central Asia', 'North Korea',
+    'Taiwan Strait', 'Black Sea', 'Baltic Sea', 'Horn of Africa', 'Sahel Region',
+  ];
+  for (const t of knownTheaters) {
+    if (reportText.includes(t)) return t;
+  }
+
+  // Fallback: geographic region pattern
+  const geoMatch = reportText.match(
+    /(?:in|of|at)\s+(?:the\s+)?([\w\s]{3,30}(?:Sea|Gulf|Strait|Region|Peninsula|Theater))/i,
+  );
+  if (geoMatch) return geoMatch[1].trim();
+
+  return 'Global';
+}
+
+function extractTimeHorizon(content: string): string {
+  const match = content.match(/(\d+)[\s-]*(?:hour|hr)/i);
+  if (match) return `${match[1]}h`;
+  const dayMatch = content.match(/(\d+)[\s-]*(?:day|d\b)/i);
+  if (dayMatch) return `${dayMatch[1]}d`;
+  return '72h'; // default for most MiroFish scenarios
+}
+
+function extractFactions(content: string, type: 'supporting' | 'dissenting'): string[] {
+  const factions: string[] = [];
+  // Look for named entities in alliance/opposition patterns
+  if (type === 'supporting') {
+    const matches = content.matchAll(
+      /(?:allied with|supports?|aligned with|backed by|in (?:favor|support))\s+(?:the\s+)?([A-Z][\w\s]{2,40}?)(?:\.|,|;|\band\b)/gi,
+    );
+    for (const m of matches) factions.push(m[1].trim());
+  } else {
+    const matches = content.matchAll(
+      /(?:opposes?|against|opposing|in opposition|dissent|adversar)\s+(?:the\s+)?([A-Z][\w\s]{2,40}?)(?:\.|,|;|\band\b)/gi,
+    );
+    for (const m of matches) factions.push(m[1].trim());
+  }
+  return [...new Set(factions)].slice(0, 5);
+}
+
+function estimateConfidence(content: string): number {
+  // Look for explicit confidence/probability values
+  const pctMatch = content.match(/(\d{1,3})%\s*(?:confidence|probability|likelihood|chance)/i);
+  if (pctMatch) return Math.min(parseFloat(pctMatch[1]) / 100, 1);
+
+  const decMatch = content.match(/confidence[:\s]+(\d\.\d+)/i);
+  if (decMatch) return Math.min(parseFloat(decMatch[1]), 1);
+
+  // Infer from language strength
+  const strongWords = /will\s|certain|inevitable|imminent|definite|assured/i;
+  const moderateWords = /likely|expect|predict|anticipat|probable|forecast/i;
+  const weakWords = /may|might|could|possible|potential|uncertain/i;
+
+  const text = content.slice(0, 1000);
+  if (strongWords.test(text)) return 0.85;
+  if (moderateWords.test(text)) return 0.72;
+  if (weakWords.test(text)) return 0.55;
+  return 0.65; // moderate default
+}
+
+function extractFirstParagraph(content: string): string {
+  const lines = content.split('\n').filter((l) => {
+    const trimmed = l.trim();
+    return trimmed.length > 20 && !trimmed.startsWith('#') && !trimmed.startsWith('>');
+  });
+  const first = lines[0]?.trim() ?? '';
+  // Truncate to ~200 chars at sentence boundary
+  if (first.length <= 200) return first;
+  const sentenceEnd = first.indexOf('. ', 100);
+  if (sentenceEnd > 0) return first.slice(0, sentenceEnd + 1);
+  return first.slice(0, 200) + '...';
+}
+
+// ── Structured Block Parser (original) ────────────────────────────────
+
 function extractField(block: string, label: string): string | undefined {
-  // Anchor on line starts and only consume within the current line
-  // so an empty value (e.g. `- Supporting Factions:`) does not hop onto
-  // the following line.
   const regex = new RegExp(
     `^[ \\t]*-[ \\t]*(?:\\*\\*)?${label}:(?:\\*\\*)?[ \\t]*(.*)$`,
     'im',
@@ -55,88 +144,106 @@ function extractField(block: string, label: string): string | undefined {
   return (match[1] ?? '').trim();
 }
 
-/** Parse comma-separated faction names from a field value. */
 function parseFactions(value: string | undefined): string[] {
   if (!value) return [];
-  return value
-    .split(',')
-    .map((f) => f.trim())
-    .filter(Boolean);
+  return value.split(',').map((f) => f.trim()).filter(Boolean);
 }
 
-/** Clamp a number into the inclusive [min, max] range. */
 function clamp(value: number, min: number, max: number): number {
   if (value < min) return min;
   if (value > max) return max;
   return value;
 }
 
-// ── Parser ─────────────────────────────────────────────────────────────
-
-/**
- * Parse predictions from MiroFish simulation report text.
- *
- * Expected format in report:
- * ```
- * **Prediction N: <Title>**
- * - Theater: <theater>
- * - Type: <prediction_type>
- * - Summary: <text>
- * - Confidence: <0.0-1.0>
- * - Time Horizon: <duration>
- * - Supporting Factions: <comma-separated>
- * - Dissenting Factions: <comma-separated>
- * ```
- */
-export function parsePredictions(reportText: string): ParsedPrediction[] {
-  if (!reportText) return [];
-
+function parseStructuredBlocks(reportText: string): ParsedPrediction[] {
   const predictions: ParsedPrediction[] = [];
-
-  // Split on prediction block headers. Using [\s\S] to tolerate any
-  // title text (or none) between "Prediction N" and the closing `**`.
   const blocks = reportText.split(/\*\*Prediction\s+\d+[\s\S]*?\*\*/);
 
-  // First element is text before the first prediction — skip it
   for (let i = 1; i < blocks.length; i++) {
     const block = blocks[i];
-
     const theater = extractField(block, 'Theater');
     const type = extractField(block, 'Type');
     const summary = extractField(block, 'Summary');
     const confidenceStr = extractField(block, 'Confidence');
     const timeHorizon = extractField(block, 'Time Horizon');
-    const supportingStr = extractField(block, 'Supporting Factions');
-    const dissentingStr = extractField(block, 'Dissenting Factions');
 
-    if (!theater || !type || !summary || !confidenceStr || !timeHorizon) {
-      log.warn({ blockIndex: i }, 'Skipping prediction block: missing required field');
-      continue;
-    }
-
+    if (!theater || !type || !summary || !confidenceStr || !timeHorizon) continue;
     const parsedConfidence = parseFloat(confidenceStr);
-    if (isNaN(parsedConfidence)) {
-      log.warn({ blockIndex: i, confidenceStr }, 'Skipping prediction block: non-numeric confidence');
-      continue;
-    }
-    const confidence = clamp(parsedConfidence, 0, 1);
-
-    if (!VALID_PREDICTION_TYPES.has(type)) {
-      log.warn({ blockIndex: i, type }, 'Skipping prediction block: unknown prediction type');
-      continue;
-    }
+    if (isNaN(parsedConfidence)) continue;
+    if (!VALID_PREDICTION_TYPES.has(type)) continue;
 
     predictions.push({
       theater,
       predictionType: type,
       summary,
+      confidence: clamp(parsedConfidence, 0, 1),
+      timeHorizon,
+      supportingFactions: parseFactions(extractField(block, 'Supporting Factions')),
+      dissentingFactions: parseFactions(extractField(block, 'Dissenting Factions')),
+    });
+  }
+  return predictions;
+}
+
+// ── Narrative Section Parser (MiroFish actual output) ──────────────────
+
+function parseNarrativeSections(reportText: string): ParsedPrediction[] {
+  const predictions: ParsedPrediction[] = [];
+  const theater = extractTheater(reportText);
+
+  // Split by ## headings
+  const sections = reportText.split(/(?=## )/);
+
+  for (const section of sections) {
+    const headingMatch = section.match(/^## (.+?)(?:\n|$)/);
+    if (!headingMatch) continue;
+
+    const heading = headingMatch[1].trim();
+    const content = section.slice(headingMatch[0].length);
+
+    if (content.trim().length < 50) continue;
+
+    const predictionType = inferPredictionType(heading, content);
+    const summary = extractFirstParagraph(content);
+    const confidence = estimateConfidence(content);
+    const timeHorizon = extractTimeHorizon(content);
+
+    if (!summary) continue;
+
+    predictions.push({
+      theater,
+      predictionType,
+      summary,
       confidence,
       timeHorizon,
-      supportingFactions: parseFactions(supportingStr),
-      dissentingFactions: parseFactions(dissentingStr),
+      supportingFactions: extractFactions(content, 'supporting'),
+      dissentingFactions: extractFactions(content, 'dissenting'),
     });
   }
 
-  log.info({ count: predictions.length }, 'Parsed predictions from report');
   return predictions;
+}
+
+// ── Public API ─────────────────────────────────────────────────────────
+
+/**
+ * Parse predictions from MiroFish simulation report text.
+ *
+ * Tries structured block format first (explicit `**Prediction N:**` blocks).
+ * Falls back to narrative section format (`## Section Heading` with prose).
+ */
+export function parsePredictions(reportText: string): ParsedPrediction[] {
+  if (!reportText) return [];
+
+  // Try structured format first
+  const structured = parseStructuredBlocks(reportText);
+  if (structured.length > 0) {
+    log.info({ count: structured.length, format: 'structured' }, 'Parsed predictions from report');
+    return structured;
+  }
+
+  // Fallback to narrative sections
+  const narrative = parseNarrativeSections(reportText);
+  log.info({ count: narrative.length, format: 'narrative' }, 'Parsed predictions from report');
+  return narrative;
 }
