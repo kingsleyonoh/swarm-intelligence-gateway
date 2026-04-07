@@ -51,7 +51,7 @@ interface GlobeInstance {
   _destructor?(): void;
 }
 
-type GlobeFactory = (element: HTMLElement) => GlobeInstance;
+type GlobeFactory = () => (element: HTMLElement) => GlobeInstance;
 
 export class GlobeRenderer {
   private container: HTMLElement;
@@ -69,7 +69,7 @@ export class GlobeRenderer {
   async init(): Promise<void> {
     const Globe = (await import('globe.gl')).default as unknown as GlobeFactory;
 
-    this.globe = Globe(this.container)
+    this.globe = Globe()(this.container)
       .globeImageUrl(EARTH_TEXTURE_URL)
       .backgroundColor(BG_COLOR)
       .atmosphereColor(ATMOSPHERE_COLOR)

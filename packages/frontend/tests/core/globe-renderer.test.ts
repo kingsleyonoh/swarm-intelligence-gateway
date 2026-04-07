@@ -41,8 +41,8 @@ vi.mock('globe.gl', () => {
     _destructor: vi.fn(),
   };
 
-  // Globe() is a function that takes an HTMLElement and returns the instance
-  const GlobeConstructor = vi.fn(() => mockGlobeInstance);
+  // Globe() returns a factory, factory(element) returns the instance (Kapsule pattern)
+  const GlobeConstructor = vi.fn(() => vi.fn(() => mockGlobeInstance));
 
   return {
     default: GlobeConstructor,
