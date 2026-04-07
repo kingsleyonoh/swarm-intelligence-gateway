@@ -39,6 +39,32 @@ async function checkRedis(): Promise<boolean> {
 }
 
 /**
+ * Check whether an upstream HTTP service is reachable.
+ *
+ * Any HTTP response (including 404, 500, 302) means the server IS running
+ * and reachable — only network-level failures (connection refused, DNS
+ * failure, timeout) indicate the service is truly down.
+ *
+ * @param url - Full URL to check (e.g. "http://localhost:5001")
+ * @returns 'ok' if any HTTP response received, 'error' on network failure
+ */
+export async function checkServiceReachable(
+  url: string,
+): Promise<'ok' | 'error'> {
+  try {
+    await fetch(url, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000),
+    });
+    // Any HTTP response (even 404, 500) means the server is reachable
+    return 'ok';
+  } catch (err) {
+    log.warn({ err, url }, 'Service reachability check failed');
+    return 'error';
+  }
+}
+
+/**
  * Check MiroFish API reachability.
  *
  * @returns 'ok' | 'error' | 'unconfigured'
@@ -48,16 +74,7 @@ async function checkMirofish(): Promise<'ok' | 'error' | 'unconfigured'> {
     return 'unconfigured';
   }
 
-  try {
-    const response = await fetch(env.MIROFISH_API_URL, {
-      method: 'GET',
-      signal: AbortSignal.timeout(5000),
-    });
-    return response.ok ? 'ok' : 'error';
-  } catch (err) {
-    log.warn({ err }, 'MiroFish health check failed');
-    return 'error';
-  }
+  return checkServiceReachable(env.MIROFISH_API_URL);
 }
 
 /**
