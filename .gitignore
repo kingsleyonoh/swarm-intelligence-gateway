@@ -51,3 +51,10 @@ coverage/
 # Logs
 *.log
 npm-debug.log*
+
+# AI agent definitions + sync state (process files, not project code)
+.agent/agents/
+.agent/.last-sync
+
+# Build journal (private raw material for content generation)
+docs/build-journal.md
