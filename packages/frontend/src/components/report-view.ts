@@ -154,18 +154,18 @@ export function createReportView(
       const loadingEl = hero.querySelector('.report-loading');
       if (loadingEl) loadingEl.remove();
 
-      content.innerHTML = markdownToHtml(data.report);
-
       const englishPreds = data.predictions.filter((p) => !CJK.test(p.summary ?? ''));
       if (englishPreds.length > 0) {
-        // Add prediction count to hero
         const count = document.createElement('span');
         count.className = 'report-hero-stat';
         count.textContent = `${englishPreds.length} predictions extracted`;
         hero.appendChild(count);
 
-        container.appendChild(buildPredictionsSummary(englishPreds));
+        // Predictions first — key takeaways before full report
+        container.insertBefore(buildPredictionsSummary(englishPreds), content);
       }
+
+      content.innerHTML = markdownToHtml(data.report);
     })
     .catch((err) => {
       content.innerHTML = `<p class="report-error">Failed to load report: ${esc(String(err.message))}</p>`;
