@@ -230,9 +230,13 @@ export async function runSimulation(
       seedDocument: seedMarkdown,
     });
 
+    // Append English language instruction to ensure MiroFish outputs in English
+    const simRequirement = scenario.simulationRequirement +
+      '\n\nIMPORTANT: Generate ALL output in English, including agent profiles, simulation posts, and the final report.';
+
     const ontologyResult = await mirofishClient.generateOntology(
       seedMarkdown,
-      scenario.simulationRequirement,
+      simRequirement,
       `sim-${simulationId}`,
     );
 
