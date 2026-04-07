@@ -317,13 +317,21 @@ export class PredictionTimelinePanel implements Panel {
   }
 
   private showTooltip(point: PredictionPoint, event: MouseEvent): void {
-    if (!this.tooltipEl) return;
+    if (!this.tooltipEl || !this.container) return;
+    const containerW = this.container.offsetWidth;
+    const tooltipW = 280;
+    const summary = (point.summary ?? '').slice(0, 120) + (point.summary && point.summary.length > 120 ? '...' : '');
     this.tooltipEl.style.display = 'block';
-    this.tooltipEl.style.left = `${event.offsetX + 12}px`;
+    this.tooltipEl.style.maxWidth = `${tooltipW}px`;
+    // Flip to left side if near right edge
+    const x = event.offsetX + tooltipW + 20 > containerW
+      ? event.offsetX - tooltipW - 12
+      : event.offsetX + 12;
+    this.tooltipEl.style.left = `${Math.max(0, x)}px`;
     this.tooltipEl.style.top = `${event.offsetY - 8}px`;
     this.tooltipEl.innerHTML = [
       `<strong>${point.theater}</strong>`,
-      point.summary,
+      summary,
       `Confidence: ${point.confidence}`,
       `Horizon: ${point.timeHorizon}`,
     ].join('<br>');
