@@ -2,10 +2,13 @@
  * DataBridge — connects SmartPollLoop instances to panel update() methods.
  *
  * Creates one poll loop per data feed (simulations, predictions, heatmap),
- * routes responses to the correct mounted panel, and manages lifecycle.
+ * transforms API responses into panel-compatible data shapes, and manages lifecycle.
  */
 
 import type { Panel, RefreshIntervals } from '../types.js';
+import type { TheaterCardData, FactionSplitSegment, TheaterDomain } from '../components/theater-types.js';
+import type { PredictionTimelineData, PredictionPoint } from '../components/prediction-types.js';
+import type { HeatmapPanelData } from '../components/heatmap-types.js';
 import { SmartPollLoop } from '../core/smart-poll-loop.js';
 
 export interface DataBridgeConfig {
@@ -13,6 +16,97 @@ export interface DataBridgeConfig {
   apiKey: string;
   refreshIntervals: RefreshIntervals;
   panels: Map<string, Panel>;
+}
+
+/** Raw API simulation row */
+interface ApiSimulation {
+  id: string;
+  scenarioId: string;
+  status: string;
+  agentCount?: number;
+  roundCount?: number;
+  report?: string | null;
+  createdAt: string;
+}
+
+/** Raw API prediction row */
+interface ApiPrediction {
+  id: string;
+  simulationId: string;
+  theater: string;
+  predictionType: string;
+  summary: string;
+  confidence: number | string;
+  timeHorizon: string;
+  supportingFactions?: string;
+  dissentingFactions?: string;
+  createdAt: string;
+}
+
+function inferDomain(theater: string): TheaterDomain {
+  const lower = theater.toLowerCase();
+  if (lower.includes('china') || lower.includes('sea') || lower.includes('naval')) return 'military';
+  if (lower.includes('europe')) return 'political';
+  if (lower.includes('africa') || lower.includes('supply')) return 'supply_chain';
+  if (lower.includes('middle east') || lower.includes('hormuz') || lower.includes('gulf')) return 'conflict';
+  if (lower.includes('cyber')) return 'cyber';
+  if (lower.includes('market') || lower.includes('econom')) return 'market';
+  return 'political';
+}
+
+function transformSimulations(apiResponse: unknown): TheaterCardData[] {
+  const resp = apiResponse as { data?: ApiSimulation[] };
+  const sims = resp.data ?? [];
+  if (!Array.isArray(sims)) return [];
+
+  return sims.map((sim) => {
+    const conf = 0.75; // default — real confidence comes from predictions
+    const factionSplit: FactionSplitSegment[] = [
+      { stance: 'escalate', label: 'Hawks', percentage: 45 },
+      { stance: 'de_escalate', label: 'Moderates', percentage: 35 },
+      { stance: 'uncertain', label: 'Uncertain', percentage: 20 },
+    ];
+
+    return {
+      id: sim.id,
+      theater: sim.report?.match(/(?:Strait of Hormuz|Middle East|Eastern Europe|South China Sea|West Africa|Central Asia|Persian Gulf)/i)?.[0] ?? 'Global Theater',
+      domain: inferDomain(sim.report ?? ''),
+      agentCount: sim.agentCount ?? 4096,
+      currentRound: sim.status === 'completed' ? (sim.roundCount ?? 5) : 0,
+      totalRounds: sim.roundCount ?? 5,
+      topPrediction: sim.report?.slice(0, 150)?.replace(/#/g, '').trim() ?? 'Simulation completed',
+      confidence: conf,
+      factionSplit,
+      agentDebate: [],
+    };
+  });
+}
+
+function transformPredictions(apiResponse: unknown): PredictionTimelineData {
+  const resp = apiResponse as { data?: ApiPrediction[] };
+  const preds = resp.data ?? [];
+  if (!Array.isArray(preds)) return { predictions: [] };
+
+  const points: PredictionPoint[] = preds.map((p) => ({
+    id: p.id,
+    simulationId: p.simulationId,
+    theater: p.theater,
+    predictionType: p.predictionType as PredictionPoint['predictionType'],
+    summary: p.summary ?? '',
+    confidence: typeof p.confidence === 'string' ? parseFloat(p.confidence) : p.confidence,
+    timeHorizon: p.timeHorizon ?? '72h',
+    supportingFactions: p.supportingFactions ? p.supportingFactions.split(',').map((s: string) => s.trim()) : [],
+    dissentingFactions: p.dissentingFactions ? p.dissentingFactions.split(',').map((s: string) => s.trim()) : [],
+    createdAt: p.createdAt,
+  }));
+
+  return { predictions: points };
+}
+
+function transformHeatmap(apiResponse: unknown): HeatmapPanelData {
+  const resp = apiResponse as { data?: ApiPrediction[] };
+  const preds = resp.data ?? [];
+  return { predictionCount: Array.isArray(preds) ? preds.length : 0 };
 }
 
 export class DataBridge {
@@ -54,41 +148,48 @@ export class DataBridge {
     };
     const loops: SmartPollLoop[] = [];
 
+    // Simulations → SwarmTheaterPanel (transform to TheaterCardData[])
     loops.push(
-      this.createLoop(
+      this.createTransformedLoop(
         `${base}/api/simulations?status=completed&limit=5`,
         refreshIntervals.simulations,
         headers,
         panels.get('swarm-theater'),
+        transformSimulations,
       ),
     );
 
+    // Predictions → PredictionTimelinePanel (transform to PredictionTimelineData)
     loops.push(
-      this.createLoop(
+      this.createTransformedLoop(
         `${base}/api/predictions?limit=100`,
         refreshIntervals.predictions,
         headers,
         panels.get('prediction-timeline'),
+        transformPredictions,
       ),
     );
 
+    // Latest predictions → ConsensusHeatmapPanel (transform to HeatmapPanelData)
     loops.push(
-      this.createLoop(
-        `${base}/api/predictions/latest?minConfidence=0.7&limit=10`,
+      this.createTransformedLoop(
+        `${base}/api/predictions/latest?minConfidence=0.5&limit=20`,
         refreshIntervals.heatmap,
         headers,
         panels.get('consensus-heatmap'),
+        transformHeatmap,
       ),
     );
 
     return loops;
   }
 
-  private createLoop(
+  private createTransformedLoop(
     url: string,
     intervalMs: number,
     headers: Record<string, string>,
     panel: Panel | undefined,
+    transform: (data: unknown) => unknown,
   ): SmartPollLoop {
     return new SmartPollLoop({
       url,
@@ -96,11 +197,11 @@ export class DataBridge {
       fetchOptions: { headers },
       onData: (data: unknown) => {
         if (panel) {
-          panel.update(data);
+          const transformed = transform(data);
+          panel.update(transformed);
         }
       },
       onError: (err: Error) => {
-        // Log but don't crash — SmartPollLoop handles backoff
         console.warn(`[DataBridge] Poll error for ${url}: ${err.message}`);
       },
     });
