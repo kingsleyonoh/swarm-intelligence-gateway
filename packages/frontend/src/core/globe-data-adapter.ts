@@ -12,10 +12,10 @@ import { resolveTheaterCoords } from '../geo/theater-coords.js';
 const JITTER_RANGE = 0.5;
 
 /** Minimum marker size at confidence=0 */
-const MIN_SIZE = 0.3;
+const MIN_SIZE = 0.6;
 
 /** Size range added at confidence=1 */
-const SIZE_RANGE = 0.7;
+const SIZE_RANGE = 1.2;
 
 /**
  * Convert an array of PredictionPoints to GlobeMarkers.

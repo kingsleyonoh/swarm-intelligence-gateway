@@ -15,6 +15,7 @@ vi.mock('globe.gl', () => {
     backgroundColor: vi.fn().mockReturnThis(),
     atmosphereColor: vi.fn().mockReturnThis(),
     atmosphereAltitude: vi.fn().mockReturnThis(),
+    showAtmosphere: vi.fn().mockReturnThis(),
     pointsData: vi.fn().mockReturnThis(),
     pointLat: vi.fn().mockReturnThis(),
     pointLng: vi.fn().mockReturnThis(),

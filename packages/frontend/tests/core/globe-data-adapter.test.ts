@@ -105,8 +105,8 @@ describe('predictionsToMarkers', () => {
     const lowMarker = markers.find((m) => m.id === 'low')!;
     const highMarker = markers.find((m) => m.id === 'high')!;
 
-    expect(lowMarker.size).toBeCloseTo(0.3, 1);
-    expect(highMarker.size).toBeCloseTo(1.0, 1);
+    expect(lowMarker.size).toBeCloseTo(0.6, 1);
+    expect(highMarker.size).toBeCloseTo(1.8, 1);
   });
 
   it('should generate label with theater, type, and confidence', () => {

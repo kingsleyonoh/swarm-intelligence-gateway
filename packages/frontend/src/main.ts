@@ -98,12 +98,24 @@ if (panelContainer) {
 // Phase 6: Initialize Globe
 const globeContainer = document.getElementById('globe-container');
 if (globeContainer) {
+  // Buffer prediction events that arrive before globe is ready
+  let pendingPredictions: PredictionPoint[] | null = null;
+  document.addEventListener('predictions-updated', ((e: Event) => {
+    pendingPredictions = (e as CustomEvent<PredictionPoint[]>).detail;
+  }) as EventListener);
+
   import('./core/globe-renderer.js').then(async ({ GlobeRenderer }) => {
     const { predictionsToMarkers } = await import('./core/globe-data-adapter.js');
     const renderer = new GlobeRenderer(globeContainer);
     try {
       await renderer.init();
-      // Listen for prediction updates from DataBridge or demo data
+
+      // Replay any predictions that arrived during init
+      if (pendingPredictions && pendingPredictions.length > 0) {
+        renderer.updateMarkers(predictionsToMarkers(pendingPredictions));
+      }
+
+      // Listen for future prediction updates
       document.addEventListener('predictions-updated', ((e: Event) => {
         const detail = (e as CustomEvent<PredictionPoint[]>).detail;
         if (detail) {

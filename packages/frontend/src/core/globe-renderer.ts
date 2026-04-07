@@ -6,15 +6,15 @@
 
 import type { GlobeMarker } from './globe-types.js';
 
-/** Earth texture CDN URL */
+/** Earth texture — use night view for dramatic look, CDN fallback */
 const EARTH_TEXTURE_URL =
-  'https://unpkg.com/three-globe@2.35.0/example/img/earth-blue-marble.jpg';
+  'https://unpkg.com/three-globe/example/img/earth-night.jpg';
 
 /** Dark background matching header */
 const BG_COLOR = '#1A1D26';
 
-/** Copper-tinted atmosphere */
-const ATMOSPHERE_COLOR = 'rgba(181, 101, 43, 0.6)';
+/** Copper-tinted atmosphere (hex for globe.gl compatibility) */
+const ATMOSPHERE_COLOR = '#B5652B';
 
 /** Auto-rotate resume delay in ms after user interaction */
 const ROTATE_RESUME_DELAY = 3000;
@@ -25,11 +25,21 @@ const DEFAULT_POV = { lat: 20, lng: 30, altitude: 2.5 };
 /** Auto-rotate speed */
 const AUTO_ROTATE_SPEED = 0.4;
 
+/** Convert hex color to comma-separated RGB string */
+function hexToRgb(hex: string): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `${r},${g},${b}`;
+}
+
 interface GlobeInstance {
   globeImageUrl(url: string): GlobeInstance;
   backgroundColor(color: string): GlobeInstance;
   atmosphereColor(color: string): GlobeInstance;
   atmosphereAltitude(alt: number): GlobeInstance;
+  showAtmosphere(show: boolean): GlobeInstance;
   pointsData(data: unknown[]): GlobeInstance;
   pointLat(accessor: string | ((d: unknown) => number)): GlobeInstance;
   pointLng(accessor: string | ((d: unknown) => number)): GlobeInstance;
@@ -73,12 +83,14 @@ export class GlobeRenderer {
       .globeImageUrl(EARTH_TEXTURE_URL)
       .backgroundColor(BG_COLOR)
       .atmosphereColor(ATMOSPHERE_COLOR)
-      .atmosphereAltitude(0.25)
+      .atmosphereAltitude(0.4)
+      .showAtmosphere(true)
       .pointOfView(DEFAULT_POV)
       .width(this.container.clientWidth || 800)
-      .height(this.container.clientHeight || 600);
+      .height(this.container.clientHeight || 380);
 
     this.configurePoints();
+    this.configureRings();
     this.configureAutoRotate();
     this.setupResizeHandler();
   }
@@ -145,9 +157,25 @@ export class GlobeRenderer {
       .pointLat('lat')
       .pointLng('lng')
       .pointColor('color')
-      .pointAltitude(0.02)
+      .pointAltitude(0.015)
       .pointRadius('size')
       .pointLabel('label');
+  }
+
+  /** Configure pulsing ring layer accessors */
+  private configureRings(): void {
+    if (!this.globe) return;
+
+    this.globe
+      .ringLat('lat')
+      .ringLng('lng')
+      .ringColor((d: unknown) => {
+        const ring = d as { color: string };
+        return (t: number) => `rgba(${hexToRgb(ring.color)},${1 - t})`;
+      })
+      .ringMaxRadius(4)
+      .ringPropagationSpeed(2)
+      .ringRepeatPeriod(1500);
   }
 
   /** Configure auto-rotate with user interaction pause */
