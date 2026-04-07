@@ -71,6 +71,31 @@ function dissentingStance(predictionType: string): FactionStance {
   return 'uncertain';
 }
 
+/** Derive faction split from prediction types instead of hardcoding */
+function buildFactionSplit(preds: ApiPrediction[]): FactionSplitSegment[] {
+  if (preds.length === 0) {
+    return [{ stance: 'uncertain', label: 'No data', percentage: 100 }];
+  }
+  const counts = { escalate: 0, de_escalate: 0, uncertain: 0 };
+  for (const p of preds) {
+    if (p.predictionType === 'escalation') counts.escalate++;
+    else if (p.predictionType === 'de_escalation') counts.de_escalate++;
+    else counts.uncertain++;
+  }
+  const total = preds.length;
+  const segments: FactionSplitSegment[] = [];
+  if (counts.escalate > 0) {
+    segments.push({ stance: 'escalate', label: 'Escalation', percentage: Math.round((counts.escalate / total) * 100) });
+  }
+  if (counts.de_escalate > 0) {
+    segments.push({ stance: 'de_escalate', label: 'De-escalation', percentage: Math.round((counts.de_escalate / total) * 100) });
+  }
+  if (counts.uncertain > 0) {
+    segments.push({ stance: 'uncertain', label: 'Other', percentage: Math.round((counts.uncertain / total) * 100) });
+  }
+  return segments;
+}
+
 // Module-level cache shared between transform functions
 let cachedPredictions: ApiPrediction[] = [];
 
@@ -103,7 +128,12 @@ export function transformSimulations(apiResponse: unknown): TheaterCardData[] {
   if (!Array.isArray(sims)) return [];
 
   return sims.map((sim) => {
-    const simPreds = cachedPredictions.filter((p) => p.simulationId === sim.id);
+    // Match predictions to simulation; fall back to all predictions
+    // if none match (handles manual insertion / ID mismatch edge cases)
+    let simPreds = cachedPredictions.filter((p) => p.simulationId === sim.id);
+    if (simPreds.length === 0 && cachedPredictions.length > 0) {
+      simPreds = cachedPredictions;
+    }
     const topPred = simPreds.sort((a, b) => {
       const ca = typeof a.confidence === 'string' ? parseFloat(a.confidence) : a.confidence;
       const cb = typeof b.confidence === 'string' ? parseFloat(b.confidence) : b.confidence;
@@ -115,11 +145,7 @@ export function transformSimulations(apiResponse: unknown): TheaterCardData[] {
       ? (typeof topPred.confidence === 'string' ? parseFloat(topPred.confidence) : topPred.confidence)
       : 0.75;
 
-    const factionSplit: FactionSplitSegment[] = [
-      { stance: 'escalate', label: 'Hawks', percentage: 45 },
-      { stance: 'de_escalate', label: 'Moderates', percentage: 35 },
-      { stance: 'uncertain', label: 'Uncertain', percentage: 20 },
-    ];
+    const factionSplit = buildFactionSplit(simPreds);
 
     return {
       id: sim.id,
