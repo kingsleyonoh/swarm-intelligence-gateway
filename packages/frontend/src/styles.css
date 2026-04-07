@@ -164,7 +164,52 @@ body::after {
   border: 1px solid rgba(181, 101, 43, 0.25);
 }
 
-#globe-container { display: none; }
+/* ── Globe Container ─────────────────────────────────────────────── */
+#globe-container {
+  display: block;
+  width: 100%;
+  height: 420px;
+  background: var(--header-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Bottom fade from dark globe into parchment panels */
+#globe-container::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 80px;
+  background: linear-gradient(to bottom, transparent, var(--parchment));
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Loading skeleton while globe.gl initializes */
+#globe-container:empty::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(181,101,43,0.1) 0%, transparent 70%);
+  animation: globe-pulse 2s ease-in-out infinite;
+}
+
+@keyframes globe-pulse {
+  0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(0.9); }
+  50% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.1); }
+}
+
+/* Copper bottom border matching header pattern */
+#globe-container .globe-border-bottom {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--copper), transparent);
+  z-index: 3;
+}
 
 /* ── Panel Container ──────────────────────────────────────────────── */
 #panel-container {
@@ -902,6 +947,32 @@ body::after {
 }
 
 .color-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Animated Faction Edges ───────────────────────────────────────── */
+@keyframes dash-flow {
+  to { stroke-dashoffset: -20; }
+}
+
+.faction-map-svg .faction-edge {
+  animation: dash-flow 1.5s linear infinite;
+}
+
+/* ── Node Pulse on Data Update ────────────────────────────────────── */
+@keyframes node-pulse {
+  0% { transform-origin: center; transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.faction-node--updating {
+  animation: node-pulse 0.4s ease-out;
+}
+
+/* ── SVG Background Grid ─────────────────────────────────────────── */
+.faction-map-svg {
+  background: var(--parchment-deep);
+  border-radius: var(--radius);
+}
 
 /* ── Responsive ───────────────────────────────────────────────────── */
 @media (max-width: 900px) {

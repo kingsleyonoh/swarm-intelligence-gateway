@@ -29,6 +29,7 @@ import { ConsensusHeatLayer } from './layers/ConsensusHeatLayer.js';
 import { DataBridge } from './api/data-bridge.js';
 import { loadDemoData } from './api/demo-loader.js';
 import type { Panel, MapLayerConstructor } from './types.js';
+import type { PredictionPoint } from './components/prediction-types.js';
 
 // Phase 1: Initialize registries
 const panelRegistry = new PanelRegistry();
@@ -94,7 +95,28 @@ if (panelContainer) {
   }
 }
 
-// Phase 6: Globe initialization will be wired in later batches
+// Phase 6: Initialize Globe
+const globeContainer = document.getElementById('globe-container');
+if (globeContainer) {
+  import('./core/globe-renderer.js').then(async ({ GlobeRenderer }) => {
+    const { predictionsToMarkers } = await import('./core/globe-data-adapter.js');
+    const renderer = new GlobeRenderer(globeContainer);
+    try {
+      await renderer.init();
+      // Listen for prediction updates from DataBridge or demo data
+      document.addEventListener('predictions-updated', ((e: Event) => {
+        const detail = (e as CustomEvent<PredictionPoint[]>).detail;
+        if (detail) {
+          renderer.updateMarkers(predictionsToMarkers(detail));
+        }
+      }) as EventListener);
+    } catch (err) {
+      console.warn('[swarm] Globe init failed (WebGL may not be available):', err);
+    }
+  }).catch((err) => {
+    console.warn('[swarm] Globe module load failed:', err);
+  });
+}
 
 // Phase 7: Start polling loops via DataBridge
 const mountedPanels = new Map<string, Panel>();

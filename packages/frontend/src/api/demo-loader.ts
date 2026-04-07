@@ -182,4 +182,11 @@ export async function loadDemoData(
   panels.get('faction-map')?.update(factionGraph);
   panels.get('prediction-timeline')?.update(timeline);
   panels.get('consensus-heatmap')?.update(heatmapData);
+
+  // Notify globe of prediction data
+  if (timeline.predictions.length > 0) {
+    document.dispatchEvent(
+      new CustomEvent('predictions-updated', { detail: timeline.predictions }),
+    );
+  }
 }

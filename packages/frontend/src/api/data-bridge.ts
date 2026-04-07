@@ -14,8 +14,6 @@ import {
   transformHeatmap,
   getCachedPredictions,
 } from './data-bridge-transforms.js';
-import type { ApiPrediction } from './data-bridge-transforms.js';
-
 export interface DataBridgeConfig {
   apiBaseUrl: string;
   apiKey: string;
@@ -79,6 +77,12 @@ export class DataBridge {
           const timeline = transformPredictions(data);
           if (factionPanel) {
             factionPanel.update(transformFactions(getCachedPredictions()));
+          }
+          // Notify globe of new prediction data
+          if (timeline.predictions.length > 0) {
+            document.dispatchEvent(
+              new CustomEvent('predictions-updated', { detail: timeline.predictions }),
+            );
           }
           return timeline;
         },
