@@ -223,7 +223,7 @@ describe('SwarmTheaterPanel', () => {
       const card = container.querySelector('.theater-card') as HTMLElement;
       card.dispatchEvent(new Event('click', { bubbles: true }));
 
-      const header = container.querySelector('.report-header h2');
+      const header = container.querySelector('.report-hero-theater');
       expect(header?.textContent).toBe('Test Theater');
 
       const loading = container.querySelector('.report-loading');
