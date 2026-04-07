@@ -164,6 +164,7 @@ export function transformSimulations(apiResponse: unknown): TheaterCardData[] {
       confidence: conf,
       factionSplit,
       agentDebate: buildDebatePosts(simPreds),
+      status: sim.status,
     };
   });
 }

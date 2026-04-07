@@ -12,6 +12,7 @@ import { THEATER_DOMAINS } from './theater-types.js';
 import {
   createConfidenceGauge,
   createFactionSplitBar,
+  createSimulationPulse,
 } from './theater-helpers.js';
 import { createReportView } from './report-view.js';
 
@@ -170,6 +171,12 @@ export class SwarmTheaterPanel implements Panel {
 
     card.appendChild(createConfidenceGauge(data.confidence));
     card.appendChild(createFactionSplitBar(data.factionSplit));
+
+    const pulse = createSimulationPulse(data.status);
+    if (pulse) {
+      card.classList.add('theater-card--simulating');
+      card.insertBefore(pulse, card.firstChild);
+    }
 
     card.addEventListener('click', () => this.expandCard(data.id));
 

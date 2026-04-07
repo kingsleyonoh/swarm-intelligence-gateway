@@ -118,6 +118,37 @@ function buildPredictionsSummary(predictions: ReportPrediction[]): HTMLElement {
   return section;
 }
 
+/** Apply staggered reveal animation to content children */
+export function revealElements(container: HTMLElement): void {
+  const children = Array.from(container.children);
+  for (let i = 0; i < children.length; i++) {
+    const el = children[i] as HTMLElement;
+    el.classList.add('report-reveal-hidden');
+
+    if (el.classList.contains('report-evidence')) {
+      el.classList.add('report-reveal-slide-left');
+    }
+
+    setTimeout(() => {
+      el.classList.remove('report-reveal-hidden');
+      el.classList.add('report-reveal-visible');
+    }, i * 80);
+  }
+}
+
+/** Apply fan-in reveal animation to prediction cards */
+export function revealPredictions(container: HTMLElement): void {
+  const cards = container.querySelectorAll('.report-prediction-card');
+  cards.forEach((card, i) => {
+    const el = card as HTMLElement;
+    el.classList.add('report-reveal-hidden', 'report-reveal-fan');
+    setTimeout(() => {
+      el.classList.remove('report-reveal-hidden');
+      el.classList.add('report-reveal-visible');
+    }, i * 120 + 200);
+  });
+}
+
 export function createReportView(
   simId: string,
   theaterName: string,
@@ -166,6 +197,11 @@ export function createReportView(
       }
 
       content.innerHTML = markdownToHtml(data.report);
+      revealElements(content);
+
+      // Reveal prediction cards in the predictions section (inserted before content)
+      const predsSection = container.querySelector('.report-predictions');
+      if (predsSection) revealPredictions(predsSection as HTMLElement);
     })
     .catch((err) => {
       content.innerHTML = `<p class="report-error">Failed to load report: ${esc(String(err.message))}</p>`;

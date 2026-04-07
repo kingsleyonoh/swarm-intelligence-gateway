@@ -131,6 +131,37 @@ export function createDebatePostEl(post: AgentDebatePost): HTMLElement {
   return el;
 }
 
+/**
+ * Create a simulation status pulse indicator.
+ * Returns null for terminal states (completed, failed, cancelled).
+ */
+export function createSimulationPulse(status: string | undefined): HTMLElement | null {
+  const ACTIVE_STATUSES: Record<string, string> = {
+    pending: 'QUEUED...',
+    queued: 'QUEUED...',
+    graph_building: 'BUILDING GRAPH...',
+    simulating: 'SIMULATING...',
+    reporting: 'GENERATING REPORT...',
+  };
+
+  const label = ACTIVE_STATUSES[status ?? ''];
+  if (!label) return null;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'sim-pulse-indicator';
+
+  const dot = document.createElement('span');
+  dot.className = 'sim-pulse-dot';
+  wrapper.appendChild(dot);
+
+  const text = document.createElement('span');
+  text.className = 'sim-pulse-text';
+  text.textContent = label;
+  wrapper.appendChild(text);
+
+  return wrapper;
+}
+
 /** Create the debate feed view with virtual scroll (max 50 visible) */
 export function createDebateFeed(
   posts: AgentDebatePost[],

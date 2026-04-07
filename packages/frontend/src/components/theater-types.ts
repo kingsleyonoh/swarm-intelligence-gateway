@@ -52,4 +52,5 @@ export interface TheaterCardData {
   confidence: number;
   factionSplit: FactionSplitSegment[];
   agentDebate: AgentDebatePost[];
+  status?: string;
 }
