@@ -139,12 +139,7 @@ export function transformSimulations(apiResponse: unknown): TheaterCardData[] {
   if (!Array.isArray(sims)) return [];
 
   return sims.map((sim) => {
-    // Match predictions to simulation; fall back to all predictions
-    // if none match (handles manual insertion / ID mismatch edge cases)
-    let simPreds = cachedPredictions.filter((p) => p.simulationId === sim.id);
-    if (simPreds.length === 0 && cachedPredictions.length > 0) {
-      simPreds = cachedPredictions;
-    }
+    const simPreds = cachedPredictions.filter((p) => p.simulationId === sim.id);
     const topPred = simPreds.sort((a, b) => {
       const ca = typeof a.confidence === 'string' ? parseFloat(a.confidence) : a.confidence;
       const cb = typeof b.confidence === 'string' ? parseFloat(b.confidence) : b.confidence;
