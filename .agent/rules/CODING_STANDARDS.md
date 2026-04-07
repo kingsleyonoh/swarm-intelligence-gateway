@@ -1,6 +1,6 @@
 # Swarm Intelligence Gateway — Coding Standards
 
-> Part 1 of 3. Also loaded: `CODING_STANDARDS_TESTING.md`, `CODING_STANDARDS_DOMAIN.md`
+> Part 1 of 4. Also loaded: `CODING_STANDARDS_TESTING.md`, `CODING_STANDARDS_TESTING_LIVE.md`, `CODING_STANDARDS_DOMAIN.md`
 
 These rules are ALWAYS ACTIVE. Follow them on every response without being asked.
 
@@ -8,9 +8,7 @@ These rules are ALWAYS ACTIVE. Follow them on every response without being asked
 - After completing ANY workflow, **read `.agent/workflows/PIPELINE.md`** and suggest the NEXT logical workflow based on the current context.
 - **PIPELINE.md is the single source of truth** for "what comes next." Individual workflows do NOT hardcode their next step — they defer to PIPELINE.md.
 - Never leave the user guessing what to do next. Always end with a clear next step.
-- **When creating a NEW workflow file**, ALWAYS add it to `PIPELINE.md` with its "When Done, Suggest" message.
-- **When deleting a workflow file**, ALWAYS remove it from `PIPELINE.md`.
-- `PIPELINE.md` must ALWAYS match the actual files in `.agent/workflows/`. If they're out of sync, fix `PIPELINE.md` immediately.
+- **When creating or deleting a workflow file**, update `PIPELINE.md` to match.
 
 ## Workflow Approval Gates (CRITICAL — Prevents Plan Mode Errors)
 When a workflow step says "present to user", "wait for approval", or "approve before proceeding":
@@ -24,44 +22,26 @@ This applies to ALL approval gates: batch selection, implementation plans, RED/G
 
 ## Domain-Specific Rules
 
-If your task touches any of the domains below, **also read the corresponding rules file before starting**. These files contain deeper conventions than fit here.
-
-| When working on... | Also read |
-|--------------------|-----------|
-| Authentication / sessions / permissions | `.agent/rules/auth_rules.md` (if exists) |
-| Database / migrations / queries | `.agent/rules/db_rules.md` (if exists) |
-| Background jobs / queues / scheduling | `.agent/rules/jobs_rules.md` (if exists) |
-| API endpoints / serializers / validation | `.agent/rules/api_rules.md` (if exists) |
-
-> These files are created by `/bootstrap` when a domain has 5+ concentrated conventions. If a file doesn't exist for a domain, the relevant rules are here in CODING_STANDARDS.md.
+If a domain-specific rules file exists in `.agent/rules/` (e.g., `auth_rules.md`, `db_rules.md`, `jobs_rules.md`, `api_rules.md`), read it before working in that area.
 
 
 ## Skill Selection & Orchestration
 You have a vast library of specialized skills available. **Use them proactively** — don't wing it when a skill exists for the task.
 
 ### How Skill Selection Works
-1. **Before starting any implementation task**, mentally scan your available skills for matches.
+1. **Before starting any task**, scan your available skills for matches.
 2. If a relevant skill exists, **read its SKILL.md first**, then follow its guidance.
-3. **Announce your choice**: *"I am invoking the [skill-name] skill to ensure this follows best practices."*
-4. When multiple skills could apply, invoke the most specific one (e.g., `react-patterns` over `frontend-design` for a React component).
+3. **Announce your choice**: *"Using skill: [skill-name] for this task."*
+4. When multiple skills apply, invoke the most specific one.
 5. **When in doubt, invoke the skill.** Reading a SKILL.md costs 30 seconds. Getting it wrong costs hours.
 
 ### When to Invoke Skills (Non-Negotiable)
-- **Building with a specific framework/library** → find the matching skill (React, Next.js, Django, FastAPI, etc.)
-- **Touching security** (auth, input validation, secrets, API exposure) → invoke a security skill
-- **Writing tests** → invoke the testing skill for your language/framework
-- **Designing a database schema or API** → invoke the design/architecture skill
+- **Building with a specific framework/library** → find the matching skill
+- **Touching security** (auth, input validation, secrets) → invoke a security skill
+- **Writing tests** → invoke the testing skill for your framework
 - **Debugging a bug** → invoke `systematic-debugging` before guessing
-- **Deploying or containerizing** → invoke the deployment skill for your platform
-- **Integrating a payment provider, email service, or external API** → check for a dedicated skill first
-- **Working with AI/LLM features** → invoke the relevant AI skill (RAG, agents, prompts)
-- **Writing documentation** → invoke the documentation skill for the format you need
+- **Deploying or containerizing** → invoke the deployment skill
 - **Unfamiliar domain or new library** → research skill first, then build
-
-### What NOT to Do
-- ❌ Skip skills because "I already know this" — the skill may have guardrails you'd miss
-- ❌ Hardcode patterns from memory when a skill has the latest best practices
-- ❌ Use a generic approach when a project-specific skill exists
 
 ## Git Commit Convention
 
@@ -77,23 +57,7 @@ You have a vast library of specialized skills available. **Use them proactively*
 | `chore` | Tooling, workflows, config, dependencies |
 | `style` | Formatting, whitespace, no logic change |
 
-**Scope** = the module or area affected. Valid scopes for this project:
-
-| Scope | Area |
-|-------|------|
-| `poller` | WorldMonitor polling (`src/worldmonitor/`) |
-| `transformer` | Data transformation (`src/transformer/`) |
-| `mirofish` | MiroFish orchestration (`src/mirofish/`) |
-| `memory` | Custom graph store (`src/memory/`) |
-| `api` | API routes + middleware (`src/api/`) |
-| `jobs` | Background jobs + queue (`src/jobs/`) |
-| `db` | Schema, migrations (`src/db/`) |
-| `shared` | Shared utilities (`src/shared/`) |
-| `config` | Configuration (`src/config/`) |
-| `auth` | Tenant auth middleware |
-| `frontend` | Swarm variant UI (`packages/frontend/`) |
-| `deploy` | Docker, CI/CD, deployment |
-| `workflows` | AI workflow system |
+**Scope** = the module affected. See scope table in `CODEBASE_CONTEXT.md` § Git Commit Scopes.
 
 **Rules:**
 - Subject line max 72 characters.
@@ -103,16 +67,9 @@ You have a vast library of specialized skills available. **Use them proactively*
 
 **Examples:**
 ```
-feat(poller): implement WorldMonitor Redis polling with package validation
-feat(transformer): generate Markdown seed documents from simulation packages
 feat(mirofish): orchestrate full graph → sim → report pipeline
-feat(memory): implement pgvector semantic episode search
-feat(api): add cursor-based pagination to simulation endpoints
 fix(auth): guard against missing X-API-Key header
-refactor(db): extract tenant scoping into query helper
 test(api): add 8 tests for prediction query edge cases
-docs(context): update CODEBASE_CONTEXT.md with graph store schema
-chore(deploy): configure GitHub Actions → GHCR → Hetzner pipeline
 ```
 
 ## AI Discipline Rules (Prevent Common AI Failures)
@@ -147,7 +104,7 @@ chore(deploy): configure GitHub Actions → GHCR → Hetzner pipeline
 
 ### Respect .gitignore (CRITICAL — Prevents Accidental Exposure)
 - **NEVER run `git add -f` on ANY file.** If a file is gitignored, it is gitignored ON PURPOSE.
-- `docs/progress.md`, `docs/architect_journal.md`, `.agent/workflows/`, `.agent/guides/`, and PRD files are LOCAL working files. They must NEVER be committed.
+- `docs/progress.md`, `docs/build-journal.md`, `docs/architect_journal.md`, `.agent/workflows/`, `.agent/guides/`, `.agent/agents/`, `.agent/.last-sync`, `.yolo/`, and PRD files are LOCAL working files. They must NEVER be committed.
 - If `git status` doesn't show a file as staged after `git add .`, that means `.gitignore` is working correctly. **Do not "fix" it.**
 - The ONLY acceptable staging command is `git add .` (which respects `.gitignore`).
 

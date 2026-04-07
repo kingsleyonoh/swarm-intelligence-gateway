@@ -1,7 +1,9 @@
 # Swarm Intelligence Gateway — Codebase Context
 
-> Last updated: 2026-04-04
-> Template synced: 2026-04-04
+> Last updated: 2026-04-07
+> Template synced: 2026-04-07
+
+> Split: `CODEBASE_CONTEXT_SCHEMA.md` (schema) | `CODEBASE_CONTEXT_PATTERNS.md` (patterns)
 
 ## Tech Stack
 
@@ -109,42 +111,19 @@ index.ts
 └── jobs/cleanup.ts → shared/db
 ```
 
-## Key Modules
+## Commands
 
-| Module | Purpose | Key Files |
-|--------|---------|-----------|
-| WorldMonitor Poller | Poll Redis for simulation packages, ingest scenarios | `src/worldmonitor/poller.ts`, `parser.ts` |
-| Data Transformer | Convert WorldMonitor packages → MiroFish inputs | `src/transformer/seed-document.ts`, `agent-profiles.ts`, `ontology.ts` |
-| MiroFish Orchestrator | Drive full MiroFish pipeline (graph → sim → report) | `src/mirofish/client.ts`, `orchestrator.ts` |
-| Custom Graph Store | PostgreSQL graph store replacing Zep Cloud (pgvector) | `src/memory/graph-store.ts` |
-| API Layer | REST API for simulation management + prediction queries | `src/api/routes/*.ts` |
-| Job Queue | BullMQ workers for long-running simulation orchestration | `src/jobs/run-simulation.ts` |
-| Frontend (Phase 4) | WorldMonitor fork with swarm prediction panels | `packages/frontend/` |
-
-## Database Schema
-
-| Table | Purpose | Key Fields |
-|-------|---------|-----------|
-| `tenants` | Multi-tenant isolation | id (UUID), api_key_hash, is_active, settings (JSONB) |
-| `scenarios` | WorldMonitor simulation packages | id, tenant_id FK, worldmonitor_run_id, theaters/entities/event_seeds/constraints (JSONB) |
-| `simulations` | MiroFish simulation runs | id, tenant_id FK, scenario_id FK, status, seed_document, report, cost_estimate_usd |
-| `graph_nodes` | Knowledge graph entities | id, simulation_id FK, entity_type, embedding VECTOR(384) |
-| `graph_edges` | Entity relationships | id, simulation_id FK, source_node_id FK, target_node_id FK, edge_type, weight |
-| `agent_episodes` | Per-agent memory during simulation | id, simulation_id FK, agent_id, round_number, action_type, embedding VECTOR(384) |
-| `agent_profiles` | Generated OASIS agent profiles | id, simulation_id FK, agent_id, persona, entity_class, stance |
-| `predictions` | Extracted predictions from reports | id, simulation_id FK, theater, prediction_type, confidence, time_horizon |
-
-## External Integrations
-
-| Service | Purpose | Auth Method |
-|---------|---------|------------|
-| WorldMonitor (self-hosted) | Source of simulation packages via Redis | Redis connection string (UPSTASH_REDIS_URL) |
-| MiroFish (self-hosted) | Swarm simulation engine via Flask API | None (localhost) or API key |
-| DeepSeek API | LLM inference for MiroFish | Bearer token (DEEPSEEK_API_KEY) |
-| Notification Hub (ecosystem) | Event routing for high-confidence predictions | API key (NOTIFICATION_HUB_API_KEY) |
-| Webhook Engine (ecosystem) | External event triggers for simulations | Shared secret (WEBHOOK_SECRET) |
-| Sentry | Error tracking | DSN (SENTRY_DSN) |
-| UptimeRobot | Uptime monitoring on /health | External service |
+| Action | Command |
+|--------|---------|
+| Dev server | `npm run dev` |
+| Run tests | `npm test` (Vitest) |
+| Run tests (watch) | `npm run test:watch` |
+| Lint/check | `npx tsc --noEmit` |
+| Build | `npm run build` |
+| Migrate DB | `npm run db:migrate` |
+| Generate migration | `npm run db:generate` |
+| Seed default tenant | `npm run setup` |
+| Start (production) | `npm start` |
 
 ## Environment Variables
 
@@ -171,228 +150,23 @@ index.ts
 | `SENTRY_DSN` | Sentry error tracking | Sentry |
 | `DEMO_MODE` | Enable demo security protections | Config |
 
-## Commands
+## Git Commit Scopes
 
-| Action | Command |
-|--------|---------|
-| Dev server | `npm run dev` |
-| Run tests | `npm test` (Vitest) |
-| Run tests (watch) | `npm run test:watch` |
-| Lint/check | `npx tsc --noEmit` |
-| Build | `npm run build` |
-| Migrate DB | `npm run db:migrate` |
-| Generate migration | `npm run db:generate` |
-| Seed default tenant | `npm run setup` |
-| Start (production) | `npm start` |
-
-## Tenant Model
-
-- **Isolation strategy:** API key auth via `X-API-Key` header → hash → tenant lookup
-- **Tenant table:** `tenants` (id UUID, api_key_hash, is_active, settings JSONB)
-- **Tenant middleware:** `src/api/middleware/auth.ts` — resolves tenant from API key, attaches to request
-- **Scoping:** Every query includes `WHERE tenant_id = ?` — enforced at route handler level via Drizzle
-
-## Key Patterns & Conventions
-
-- File naming: `kebab-case.ts` for source files
-- Import conventions: standard lib → third-party → local, blank line between groups
-- Error handling: custom error classes in `src/shared/errors.ts`, global Fastify error handler
-- Logging: Pino JSON structured logging via `src/shared/logger.ts`
-- Status tracking: simulation status machine (pending → queued → graph_building → simulating → reporting → completed | failed | cancelled)
-- Pagination: cursor-based (`?cursor=<id>&limit=20`, default 20, max 100)
-- Error format: `{ error: { code, message, timestamp } }`
-- Ecosystem events: standard envelope `{ event_type, source: "swarm-gateway", tenant_id, timestamp, payload }`
-
-## Architecture Patterns
-
-### Error Response Format
-
-All API errors MUST follow this shape. Implemented in `src/api/middleware/error-handler.ts`.
-
-```typescript
-// Response shape for ALL error responses:
-{
-  error: {
-    code: string,       // Machine-readable: VALIDATION_ERROR, NOT_FOUND, UNAUTHORIZED, FORBIDDEN, CONFLICT, INTERNAL_ERROR
-    message: string,    // Human-readable explanation
-    timestamp: string   // ISO-8601 timestamp
-  }
-}
-
-// HTTP status mapping:
-// VALIDATION_ERROR   → 400
-// UNAUTHORIZED       → 401
-// FORBIDDEN          → 403
-// NOT_FOUND          → 404
-// CONFLICT           → 409
-// INTERNAL_ERROR     → 500
-```
-
-### Request-Scoped Caching (Auth Tenant Resolution)
-
-Expensive lookups (tenant resolution from API key, config values) run ONCE per request via Fastify request decorators. Never call the same lookup twice in the same request lifecycle.
-
-```typescript
-// Pattern: Decorate request with resolved tenant in auth middleware
-// src/api/middleware/auth.ts
-
-// 1. Declare the decorator type on Fastify instance
-fastify.decorateRequest('tenant', null);
-
-// 2. Resolve tenant once in preHandler hook
-fastify.addHook('preHandler', async (request, reply) => {
-  if (request.tenant) return; // Already resolved (e.g., nested hooks)
-  const apiKey = request.headers['x-api-key'] as string;
-  if (!apiKey) throw new UnauthorizedError('Missing X-API-Key header');
-
-  const hash = sha256(apiKey);
-  const tenant = await db.select().from(tenants).where(eq(tenants.apiKeyHash, hash)).limit(1);
-  if (!tenant[0] || !tenant[0].isActive) throw new UnauthorizedError('Invalid API key');
-
-  request.tenant = tenant[0]; // Cached for this request's lifetime
-});
-
-// 3. Route handlers access request.tenant directly — no re-lookup
-fastify.get('/api/scenarios', async (request) => {
-  const results = await db.select().from(scenarios)
-    .where(eq(scenarios.tenantId, request.tenant.id));
-  return results;
-});
-```
-
-### Data Fetching via Drizzle
-
-Every query MUST include tenant_id scoping. Use cursor-based pagination (never offset).
-
-```typescript
-// Tenant-scoped query (MANDATORY for all data access):
-const results = await db.select()
-  .from(scenarios)
-  .where(eq(scenarios.tenantId, tenant.id));
-
-// Cursor-based pagination pattern:
-// Query params: ?cursor=<lastId>&limit=20 (default 20, max 100)
-const limit = Math.min(parsed.limit ?? 20, 100);
-const query = db.select()
-  .from(simulations)
-  .where(and(
-    eq(simulations.tenantId, tenant.id),
-    cursor ? gt(simulations.id, cursor) : undefined,
-  ))
-  .orderBy(asc(simulations.id))
-  .limit(limit + 1); // Fetch one extra to detect "has more"
-
-const rows = await query;
-const hasMore = rows.length > limit;
-const data = hasMore ? rows.slice(0, limit) : rows;
-const nextCursor = hasMore ? data[data.length - 1].id : null;
-// Return: { data, cursor: nextCursor }
-```
-
-### API Key Auth Guard
-
-Tenant authentication via API key hashing. Applied as a Fastify preHandler hook on protected routes.
-
-```typescript
-// Flow: X-API-Key header → SHA-256 hash → lookup in tenants table → attach to request
-// File: src/api/middleware/auth.ts
-
-// Hash function: crypto.createHash('sha256').update(apiKey).digest('hex')
-// The plaintext API key is NEVER stored — only the hash.
-// Registration endpoint returns the plaintext key ONCE, then discards it.
-
-// Protected route registration:
-fastify.register(async (app) => {
-  app.addHook('preHandler', authMiddleware); // All routes in this scope require auth
-  app.register(scenarioRoutes, { prefix: '/api/scenarios' });
-  app.register(simulationRoutes, { prefix: '/api/simulations' });
-  app.register(predictionRoutes, { prefix: '/api/predictions' });
-});
-
-// Public routes (no auth):
-// POST /api/tenants/register
-// GET  /health, /health/db, /health/ready
-```
-
-### BullMQ Job Patterns
-
-Queue definitions and worker patterns for background processing.
-
-```typescript
-// Queue names (defined in src/shared/queue.ts):
-// - 'run-simulation'       — on-demand, triggered by scenario ingestion
-// - 'poll-worldmonitor'    — not a BullMQ queue; uses node-cron directly
-
-// Job options for run-simulation:
-{
-  attempts: 2,
-  backoff: { type: 'exponential', delay: 60000 }, // 1min, then 5min
-  removeOnComplete: { count: 100 },  // Keep last 100 completed jobs
-  removeOnFail: { count: 50 },       // Keep last 50 failed jobs
-}
-
-// Worker pattern (src/jobs/run-simulation.ts):
-const worker = new Worker('run-simulation', async (job) => {
-  const { scenarioId, tenantId } = job.data;
-  await orchestrateSimulation(scenarioId, tenantId);
-}, {
-  connection: redisConnection,
-  concurrency: 1,  // Resource-intensive — one at a time
-});
-
-// Graceful shutdown (src/index.ts):
-process.on('SIGTERM', async () => {
-  await worker.close();     // Finish current job, stop accepting new ones
-  await queue.close();      // Close queue connection
-  await redis.quit();       // Close Redis connection
-  await db.end();           // Close DB pool
-  process.exit(0);
-});
-
-// Cron jobs (src/jobs/poll-worldmonitor.ts, src/jobs/cleanup.ts):
-// Use node-cron, NOT BullMQ repeatable jobs
-// poll-worldmonitor: '0 * * * *'  (every 60 min)
-// cleanup:          '0 3 * * *'   (daily 03:00 UTC)
-// Concurrency guard: use a mutex flag to prevent overlapping cron runs
-```
-
-### Fastify Test Pattern (API Integration Tests)
-
-Use Fastify's built-in `inject()` for API testing against real local services.
-
-```typescript
-// tests/api/example.test.ts
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { buildApp } from '../../src/api/server.js';
-
-describe('GET /health', () => {
-  let app: ReturnType<typeof buildApp>;
-
-  beforeAll(async () => {
-    app = await buildApp();  // Returns configured Fastify instance
-  });
-
-  afterAll(async () => {
-    await app.close();
-  });
-
-  it('should return ok', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: '/health',
-    });
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: 'ok' });
-  });
-});
-```
-
-## Deployment Notes
-
-- **Region co-location is mandatory.** The Hetzner VPS (CX33) must be provisioned in the same region as any managed database. Cross-region latency adds 50-100ms per query and compounds across the pipeline.
-- If using **Supabase** for managed PostgreSQL, select the EU region closest to the Hetzner datacenter (e.g., if Hetzner is `fsn1` / Falkenstein, use Supabase `eu-central-1` / Frankfurt).
-- The **production Docker Compose** (`docker-compose.prod.yml`) runs all services on a single host, so there is no cross-region latency between the app, PostgreSQL, and Redis containers.
-- For local development, `docker-compose.yml` runs PostgreSQL (pgvector/pgvector:pg16) on port 5432 and Redis (redis:7-alpine) on port 6379. Start with `docker compose up -d`.
+| Scope | Area |
+|-------|------|
+| `poller` | WorldMonitor polling (`src/worldmonitor/`) |
+| `transformer` | Data transformation (`src/transformer/`) |
+| `mirofish` | MiroFish orchestration (`src/mirofish/`) |
+| `memory` | Custom graph store (`src/memory/`) |
+| `api` | API routes + middleware (`src/api/`) |
+| `jobs` | Background jobs + queue (`src/jobs/`) |
+| `db` | Schema, migrations (`src/db/`) |
+| `shared` | Shared utilities (`src/shared/`) |
+| `config` | Configuration (`src/config/`) |
+| `auth` | Tenant auth middleware |
+| `frontend` | Swarm variant UI (`packages/frontend/`) |
+| `deploy` | Docker, CI/CD, deployment |
+| `workflows` | AI workflow system |
 
 ## Gotchas & Lessons Learned
 
@@ -401,6 +175,23 @@ describe('GET /health', () => {
 | Date | Area | Gotcha | Discovered In |
 |------|------|--------|---------------|
 | 2026-04-04 | deploy | Hetzner VPS must be co-located with DB region to avoid 50-100ms per-query latency penalty | Batch 001 setup |
+| 2026-04-05 | Zod v4 | `.transform().pipe().default()` doesn't run transform on default value — use `z.preprocess()` | Phase 1 env validation |
+| 2026-04-05 | Windows | CRLF regex greediness: `\s*(.*)` swallows newlines — use `^…$` with `m` flag, `[ \t]` for whitespace | Phase 2 prediction parser |
+| 2026-04-05 | ioredis | Default import fails in strict ESM — use `import { Redis } from 'ioredis'` | Phase 1 Redis setup |
+| 2026-04-05 | Node 22 | ESM import hoisting evaluates env.ts before dotenv — use `--env-file=.env.local` flag | Phase 2 smoke test |
+| 2026-04-06 | Docker | CRLF in shell scripts breaks Docker builds on Windows — `sed -i 's/\r$//'` before building | Phase 6 WorldMonitor setup |
+| 2026-04-06 | Docker | Port merge: docker-compose.override.yml ports MERGE with base (use `!override` to replace) | Phase 6 port mapping |
+| 2026-04-06 | Ports | 5 Redis instances on different ports: 6379 (webhook-engine), 6380 (workflow-engine), 6381 (client-portal), 6382 (worldmonitor), 6383 (swarm-gateway) | Phase 6 infrastructure |
+| 2026-04-06 | MiroFish | ALL responses wrapped in `{ data: {...}, success: bool }` — never read fields from top level | Phase 6 E2E testing |
+| 2026-04-06 | MiroFish | Ontology generation is SYNCHRONOUS (no polling needed) — returns after LLM finishes | Phase 6 E2E run 3 |
+| 2026-04-06 | MiroFish | Graph build is ASYNC — returns task_id, poll via GET /api/graph/task/:taskId | Phase 6 E2E run 4 |
+| 2026-04-06 | MiroFish | Simulation lifecycle is THREE steps: create → prepare (async) → start | Phase 6 E2E run 7 |
+| 2026-04-07 | MiroFish | Simulation completion uses `runner_status: "completed"`, NOT `status` | Phase 6 E2E run 8 |
+| 2026-04-07 | MiroFish | Report generation must be EXPLICITLY triggered (POST /report/generate) before fetching | Phase 6 E2E run 8 |
+| 2026-04-07 | MiroFish | MiroFish auto-configures round count (72 rounds instead of requested 1) — 10 agents took ~30min | Phase 6 E2E run 8 |
+| 2026-04-06 | MiroFish | 4.3GB Docker image — fails on slow connections, no partial resume. Source install needs Python <3.12 | Phase 6 MiroFish setup |
+| 2026-04-06 | WorldMonitor | Seeders use Redis lock acquisition that fails with local REST proxy — 72/95 seeders skip | Phase 6 seeder run |
+| 2026-04-06 | BullMQ | Simulation route creates record (pending) then orchestrator tried to create again → ConflictError | Phase 6 E2E run 2 |
 
 ## Shared Foundation (MUST READ before any implementation)
 
