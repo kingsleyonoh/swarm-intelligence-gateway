@@ -11,6 +11,8 @@ import {
   forceManyBody,
   forceCenter,
   forceCollide,
+  forceX,
+  forceY,
   type Simulation,
   type SimulationLinkDatum,
 } from 'd3';
@@ -104,15 +106,27 @@ export function createForceSimulation(
     MIN_COLLISION + d.memberCount * COLLISION_SCALE,
   );
 
+  // Pull nodes toward center so they don't fly off to edges
+  const pullX = forceX<ForceNode>(config.width / 2).strength(0.15);
+  const pullY = forceY<ForceNode>(config.height / 2).strength(0.15);
+
   const simulation = forceSimulation<ForceNode>(nodes)
     .force('link', linkForce)
     .force('charge', chargeForce)
     .force('center', centerForce)
     .force('collide', collideForce)
+    .force('x', pullX)
+    .force('y', pullY)
     .stop(); // Don't auto-run — caller controls via tick()
 
+  const pad = 50;
   const tick = (): void => {
     simulation.tick();
+    // Clamp positions inside viewBox with padding
+    for (const n of nodes) {
+      n.x = Math.max(pad, Math.min(config.width - pad, n.x));
+      n.y = Math.max(pad, Math.min(config.height - pad, n.y));
+    }
     config.onTick(nodes, edges);
   };
 
