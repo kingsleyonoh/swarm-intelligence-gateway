@@ -277,10 +277,15 @@ export async function runSimulation(
 
     await updateSimulationStatus(simulationId, SIMULATION_STATUS.REPORTING);
 
-    // Report generation is async in MiroFish — trigger, poll, then fetch
+    // Report generation is async in MiroFish — trigger, poll (by task_id), then fetch
     log.info({ simulationId, mirofishSimId }, 'Generating report');
-    await mirofishClient.generateReport(mirofishSimId);
-    await mirofishClient.pollReportStatus(mirofishSimId, ONTOLOGY_TIMEOUT_MS);
+    const reportResult = await mirofishClient.generateReport(mirofishSimId);
+    const reportData = (reportResult.data ?? reportResult) as Record<string, unknown>;
+    const reportTaskId = reportData.task_id as string;
+
+    if (reportTaskId) {
+      await mirofishClient.pollReportStatus(reportTaskId, ONTOLOGY_TIMEOUT_MS);
+    }
 
     const { report } = await mirofishClient.getReport(mirofishSimId);
 

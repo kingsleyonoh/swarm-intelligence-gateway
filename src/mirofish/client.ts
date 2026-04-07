@@ -328,10 +328,11 @@ export class MirofishClient {
   /**
    * Poll report generation progress until complete.
    *
-   * `POST /api/report/generate/status` — JSON `{ simulation_id }`.
+   * `POST /api/report/generate/status` — JSON `{ task_id }`.
+   * Note: This endpoint requires the task_id from generateReport(), NOT simulation_id.
    */
   async pollReportStatus(
-    simulationId: string,
+    taskId: string,
     timeoutMs: number = 600_000,
   ): Promise<void> {
     const deadline = Date.now() + timeoutMs;
@@ -342,7 +343,7 @@ export class MirofishClient {
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ simulation_id: simulationId }),
+          body: JSON.stringify({ task_id: taskId }),
         },
       );
 
@@ -350,7 +351,7 @@ export class MirofishClient {
       const status = data.status as string ?? '';
 
       if (status === 'completed' || status === 'complete' || data.report_id) {
-        log.info({ simulationId }, 'Report generation complete');
+        log.info({ taskId }, 'Report generation complete');
         return;
       }
 
@@ -358,7 +359,7 @@ export class MirofishClient {
         throw new Error(`Report generation failed: ${(data.error as string) ?? 'unknown'}`);
       }
 
-      log.debug({ simulationId, status }, 'Report still generating');
+      log.debug({ taskId, status }, 'Report still generating');
       await sleep(this.ontologyPollIntervalMs);
     }
 
