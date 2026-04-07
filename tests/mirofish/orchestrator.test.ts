@@ -60,6 +60,8 @@ const mocks = vi.hoisted(() => {
   const pollPrepareStatus = vi.fn();
   const startSimulation = vi.fn();
   const pollSimulationStatus = vi.fn();
+  const generateReport = vi.fn();
+  const pollReportStatus = vi.fn();
   const getReport = vi.fn();
 
   // DB mock
@@ -76,6 +78,8 @@ const mocks = vi.hoisted(() => {
     pollPrepareStatus,
     startSimulation,
     pollSimulationStatus,
+    generateReport,
+    pollReportStatus,
     getReport,
     dbSelect,
     dbInsert,
@@ -94,6 +98,8 @@ vi.mock('../../src/mirofish/client.js', () => ({
     pollPrepareStatus = mocks.pollPrepareStatus;
     startSimulation = mocks.startSimulation;
     pollSimulationStatus = mocks.pollSimulationStatus;
+    generateReport = mocks.generateReport;
+    pollReportStatus = mocks.pollReportStatus;
     getReport = mocks.getReport;
   },
 }));
@@ -195,6 +201,8 @@ function setupSuccessfulMirofishMocks() {
   mocks.pollPrepareStatus.mockResolvedValue(undefined);
   mocks.startSimulation.mockResolvedValue({ success: true });
   mocks.pollSimulationStatus.mockResolvedValue(undefined);
+  mocks.generateReport.mockResolvedValue({ success: true });
+  mocks.pollReportStatus.mockResolvedValue(undefined);
   mocks.getReport.mockResolvedValue({
     report: `## Simulation Report
 

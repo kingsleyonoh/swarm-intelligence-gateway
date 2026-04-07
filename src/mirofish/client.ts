@@ -309,15 +309,77 @@ export class MirofishClient {
   }
 
   /**
-   * Retrieve the simulation report.
+   * Generate simulation report (async — must be triggered after simulation completes).
+   *
+   * `POST /api/report/generate` — JSON `{ simulation_id }`.
+   * Returns a task/report ID for polling.
+   */
+  async generateReport(simulationId: string): Promise<Record<string, unknown>> {
+    return this.requestWithRetry<Record<string, unknown>>(
+      `${this.baseUrl}/api/report/generate`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ simulation_id: simulationId }),
+      },
+    );
+  }
+
+  /**
+   * Poll report generation progress until complete.
+   *
+   * `POST /api/report/generate/status` — JSON `{ simulation_id }`.
+   */
+  async pollReportStatus(
+    simulationId: string,
+    timeoutMs: number = 600_000,
+  ): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const response = await this.requestWithRetry<Record<string, unknown>>(
+        `${this.baseUrl}/api/report/generate/status`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ simulation_id: simulationId }),
+        },
+      );
+
+      const data = (response.data ?? response) as Record<string, unknown>;
+      const status = data.status as string ?? '';
+
+      if (status === 'completed' || status === 'complete' || data.report_id) {
+        log.info({ simulationId }, 'Report generation complete');
+        return;
+      }
+
+      if (status === 'error' || status === 'failed') {
+        throw new Error(`Report generation failed: ${(data.error as string) ?? 'unknown'}`);
+      }
+
+      log.debug({ simulationId, status }, 'Report still generating');
+      await sleep(this.ontologyPollIntervalMs);
+    }
+
+    throw new Error(`Report generation timed out after ${timeoutMs}ms`);
+  }
+
+  /**
+   * Retrieve the generated simulation report.
    *
    * `GET /api/report/by-simulation/:simulationId`
    */
   async getReport(simulationId: string): Promise<SimulationReportResponse> {
-    return this.requestWithRetry<SimulationReportResponse>(
+    const response = await this.requestWithRetry<Record<string, unknown>>(
       `${this.baseUrl}/api/report/by-simulation/${simulationId}`,
       { method: 'GET' },
     );
+
+    // Extract report text from nested data
+    const data = (response.data ?? response) as Record<string, unknown>;
+    const report = (data.content as string) ?? (data.report as string) ?? JSON.stringify(data);
+    return { report };
   }
 
   // ── Private Helpers ───────────────────────────────────────────────

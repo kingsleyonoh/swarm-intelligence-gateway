@@ -113,6 +113,8 @@ const mocks = vi.hoisted(() => ({
   pollPrepareStatus: vi.fn(),
   startSimulation: vi.fn(),
   pollSimulationStatus: vi.fn(),
+  generateReport: vi.fn(),
+  pollReportStatus: vi.fn(),
   getReport: vi.fn(),
   dbSelect: vi.fn(),
   dbInsert: vi.fn(),
@@ -130,6 +132,8 @@ vi.mock('../../src/mirofish/client.js', () => ({
     pollPrepareStatus = mocks.pollPrepareStatus;
     startSimulation = mocks.startSimulation;
     pollSimulationStatus = mocks.pollSimulationStatus;
+    generateReport = mocks.generateReport;
+    pollReportStatus = mocks.pollReportStatus;
     getReport = mocks.getReport;
   },
 }));
@@ -217,6 +221,8 @@ function setupMirofishInstantMocks() {
   mocks.pollPrepareStatus.mockResolvedValue(undefined);
   mocks.startSimulation.mockResolvedValue({ success: true });
   mocks.pollSimulationStatus.mockResolvedValue(undefined);
+  mocks.generateReport.mockResolvedValue({ success: true });
+  mocks.pollReportStatus.mockResolvedValue(undefined);
   mocks.getReport.mockResolvedValue({ report: realisticReport });
 }
 
