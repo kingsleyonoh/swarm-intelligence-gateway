@@ -12,8 +12,13 @@ import { THEATER_DOMAINS } from './theater-types.js';
 import {
   createConfidenceGauge,
   createFactionSplitBar,
-  createDebateFeed,
 } from './theater-helpers.js';
+import { createReportView } from './report-view.js';
+
+export interface TheaterPanelConfig {
+  apiKey: string;
+  apiBaseUrl: string;
+}
 
 export class SwarmTheaterPanel implements Panel {
   readonly id = 'swarm-theater';
@@ -25,6 +30,12 @@ export class SwarmTheaterPanel implements Panel {
   private cards: TheaterCardData[] = [];
   private activeFilter: 'all' | TheaterDomain = 'all';
   private expandedCardId: string | null = null;
+  private apiConfig: TheaterPanelConfig = { apiKey: '', apiBaseUrl: '' };
+
+  /** Set API credentials for report fetching (called from main.ts after creation) */
+  setApiConfig(config: TheaterPanelConfig): void {
+    this.apiConfig = config;
+  }
 
   mount(container: HTMLElement): void {
     this.container = container;
@@ -196,24 +207,27 @@ export class SwarmTheaterPanel implements Panel {
     if (this.gridEl) this.gridEl.style.display = 'none';
     if (this.filterBarEl) this.filterBarEl.style.display = 'none';
 
-    // Remove any existing feed
-    const existing = this.container.querySelector('.debate-feed');
+    // Remove any existing view
+    const existing = this.container.querySelector('.report-view') ?? this.container.querySelector('.debate-feed');
     if (existing) existing.remove();
 
-    const feed = createDebateFeed(cardData.agentDebate, () => {
-      this.expandedCardId = null;
-      this.showGridView();
-    });
+    const view = createReportView(
+      cardData.id,
+      cardData.theater,
+      this.apiConfig.apiKey,
+      this.apiConfig.apiBaseUrl,
+      () => { this.expandedCardId = null; this.showGridView(); },
+    );
 
-    this.container.appendChild(feed);
+    this.container.appendChild(view);
   }
 
   private showGridView(): void {
     if (!this.container) return;
 
-    // Remove debate feed
-    const feed = this.container.querySelector('.debate-feed');
-    if (feed) feed.remove();
+    // Remove report/debate view
+    const view = this.container.querySelector('.report-view') ?? this.container.querySelector('.debate-feed');
+    if (view) view.remove();
 
     // Restore grid and filter bar
     if (this.gridEl) {

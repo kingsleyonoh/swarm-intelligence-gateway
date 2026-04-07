@@ -115,8 +115,16 @@ if (isDemoMode) {
     console.warn('[swarm] Demo data load failed:', err),
   );
 } else {
+  const apiBaseUrl = swarmVariant.apiBaseUrl || window.location.origin;
+
+  // Pass API config to SwarmTheaterPanel for on-demand report fetching
+  const theaterPanel = mountedPanels.get('swarm-theater');
+  if (theaterPanel && 'setApiConfig' in theaterPanel) {
+    (theaterPanel as SwarmTheaterPanel).setApiConfig({ apiKey, apiBaseUrl });
+  }
+
   dataBridge = new DataBridge({
-    apiBaseUrl: swarmVariant.apiBaseUrl || window.location.origin,
+    apiBaseUrl,
     apiKey,
     refreshIntervals: swarmVariant.refreshIntervals,
     panels: mountedPanels,

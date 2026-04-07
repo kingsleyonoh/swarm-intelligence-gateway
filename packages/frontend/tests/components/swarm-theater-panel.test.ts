@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SwarmTheaterPanel } from '../../src/components/SwarmTheaterPanel.js';
 import type { TheaterCardData } from '../../src/components/theater-types.js';
 
 function makeCard(overrides: Partial<TheaterCardData> = {}): TheaterCardData {
   return {
     id: 'sim-1',
-    theater: 'Middle East',
+    theater: 'Test Theater',
     domain: 'conflict',
     agentCount: 4096,
     currentRound: 3,
@@ -38,6 +38,11 @@ describe('SwarmTheaterPanel', () => {
   let container: HTMLElement;
 
   beforeEach(() => {
+    // Stub fetch for report view (it fetches on card click)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ report: '# Test Report', predictions: [] }),
+    }));
     panel = new SwarmTheaterPanel();
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -46,6 +51,7 @@ describe('SwarmTheaterPanel', () => {
   afterEach(() => {
     panel.unmount();
     container.remove();
+    vi.restoreAllMocks();
   });
 
   describe('instantiation', () => {
@@ -195,7 +201,7 @@ describe('SwarmTheaterPanel', () => {
   });
 
   describe('expand/collapse', () => {
-    it('clicking a card expands to agent debate feed', () => {
+    it('clicking a card expands to report view', () => {
       panel.mount(container);
       panel.update([
         makeCard({
@@ -206,26 +212,22 @@ describe('SwarmTheaterPanel', () => {
       const card = container.querySelector('.theater-card') as HTMLElement;
       card.dispatchEvent(new Event('click', { bubbles: true }));
 
-      const feed = container.querySelector('.debate-feed');
-      expect(feed).not.toBeNull();
+      const view = container.querySelector('.report-view');
+      expect(view).not.toBeNull();
     });
 
-    it('debate feed shows agent posts with faction color dots', () => {
+    it('report view shows theater name and loading state', () => {
       panel.mount(container);
-      panel.update([
-        makeCard({
-          agentDebate: [makeDebatePost(0), makeDebatePost(1)],
-        }),
-      ]);
+      panel.update([makeCard()]);
 
       const card = container.querySelector('.theater-card') as HTMLElement;
       card.dispatchEvent(new Event('click', { bubbles: true }));
 
-      const posts = container.querySelectorAll('.debate-post');
-      expect(posts.length).toBe(2);
+      const header = container.querySelector('.report-header h2');
+      expect(header?.textContent).toBe('Test Theater');
 
-      const dot = posts[0]?.querySelector('.faction-dot') as HTMLElement;
-      expect(dot).not.toBeNull();
+      const loading = container.querySelector('.report-loading');
+      expect(loading).not.toBeNull();
     });
 
     it('debate feed has a back button that returns to grid', () => {
