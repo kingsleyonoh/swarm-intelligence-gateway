@@ -56,17 +56,29 @@ export class ConsensusHeatmapPanel implements Panel {
   }
 
   private buildToggle(): HTMLElement {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'heatmap-toggle-wrapper';
+
     const btn = document.createElement('button');
     btn.className = 'heatmap-toggle';
     btn.textContent = 'Enable Heatmap';
+    wrapper.appendChild(btn);
+
+    const hint = document.createElement('span');
+    hint.className = 'heatmap-toggle-hint';
+    hint.textContent = 'Globe view required for heatmap overlay';
+    wrapper.appendChild(hint);
+
     btn.addEventListener('click', () => {
       this.enabled = !this.enabled;
-      btn.textContent = this.enabled
-        ? 'Disable Heatmap'
-        : 'Enable Heatmap';
+      btn.textContent = this.enabled ? 'Disable Heatmap' : 'Enable Heatmap';
+      btn.classList.toggle('heatmap-toggle--active', this.enabled);
+      hint.textContent = this.enabled
+        ? 'Heatmap layer active — globe view required'
+        : 'Globe view required for heatmap overlay';
       this.dispatchSettings();
     });
-    return btn;
+    return wrapper;
   }
 
   private buildSlider(): HTMLElement {

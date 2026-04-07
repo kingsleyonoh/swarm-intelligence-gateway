@@ -281,8 +281,19 @@ export class PredictionTimelinePanel implements Panel {
   private renderDots(): void {
     if (!this.plotGroup) return;
 
+    // Build jitter offsets for dots sharing the same timestamp
+    const tsCounts = new Map<string, number>();
+    const tsIndex = new Map<string, number>();
+    for (const p of this.points) {
+      tsCounts.set(p.createdAt, (tsCounts.get(p.createdAt) ?? 0) + 1);
+    }
+
     for (const point of this.points) {
-      const cx = this.scaleX(point.createdAt);
+      const idx = tsIndex.get(point.createdAt) ?? 0;
+      tsIndex.set(point.createdAt, idx + 1);
+      const total = tsCounts.get(point.createdAt) ?? 1;
+      const jitter = total > 1 ? (idx - (total - 1) / 2) * 10 : 0;
+      const cx = this.scaleX(point.createdAt) + jitter;
       const cy = this.scaleY(point.confidence);
       const color =
         PREDICTION_TYPE_COLORS[point.predictionType as PredictionType] ??

@@ -35,29 +35,7 @@ export class DataBridge {
   startAll(): void {
     if (this.running) return;
     this.running = true;
-
-    // Prime prediction cache before starting loops so simulation
-    // transform can use prediction data on its first tick.
-    const { apiBaseUrl, apiKey } = this.config;
-    const base = apiBaseUrl.replace(/\/$/, '');
-    const headers: Record<string, string> = {
-      'X-API-Key': apiKey,
-      'Content-Type': 'application/json',
-    };
-
-    fetch(`${base}/api/predictions?limit=100`, { headers })
-      .then((res) => {
-        if (!res.ok) return { data: [] as ApiPrediction[] };
-        return res.json() as Promise<{ data: ApiPrediction[] }>;
-      })
-      .then((data) => {
-        transformPredictions(data);
-        this.startLoops();
-      })
-      .catch(() => {
-        // Even if priming fails, start loops normally
-        this.startLoops();
-      });
+    this.startLoops();
   }
 
   stopAll(): void {
@@ -73,6 +51,7 @@ export class DataBridge {
   }
 
   private startLoops(): void {
+    if (!this.running) return;
     this.loops = this.createLoops();
     for (const loop of this.loops) {
       loop.start();
@@ -88,18 +67,7 @@ export class DataBridge {
     };
     const loops: SmartPollLoop[] = [];
 
-    // Simulations → SwarmTheaterPanel
-    loops.push(
-      this.createTransformedLoop(
-        `${base}/api/simulations?status=completed&limit=5`,
-        refreshIntervals.simulations,
-        headers,
-        panels.get('swarm-theater'),
-        transformSimulations,
-      ),
-    );
-
-    // Predictions → PredictionTimelinePanel + FactionMapPanel
+    // Predictions FIRST → populates cache before simulations transform
     const factionPanel = panels.get('faction-map');
     loops.push(
       this.createTransformedLoop(
@@ -114,6 +82,17 @@ export class DataBridge {
           }
           return timeline;
         },
+      ),
+    );
+
+    // Simulations → SwarmTheaterPanel (uses cached predictions for enrichment)
+    loops.push(
+      this.createTransformedLoop(
+        `${base}/api/simulations?status=completed&limit=5`,
+        refreshIntervals.simulations,
+        headers,
+        panels.get('swarm-theater'),
+        transformSimulations,
       ),
     );
 

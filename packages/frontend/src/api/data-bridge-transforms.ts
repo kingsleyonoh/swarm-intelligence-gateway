@@ -111,11 +111,17 @@ export function getCachedPredictions(): ApiPrediction[] {
   return cachedPredictions;
 }
 
+/** Format prediction type for display (e.g. "escalation" → "Escalation") */
+function formatType(type: string): string {
+  if (!type) return 'Unknown';
+  return type.replace(/_/g, '-').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 /** Build debate posts from predictions for a simulation */
 function buildDebatePosts(preds: ApiPrediction[]): AgentDebatePost[] {
   return preds.slice(0, 5).map((p, i) => {
     const factions = parseFactions(p.supportingFactions);
-    const faction = factions[0] ?? 'Unknown';
+    const faction = factions[0] || `${p.theater} ${formatType(p.predictionType)}`;
     return {
       agentId: `agent-${p.id}-${i}`,
       username: faction.replace(/\s+/g, '_'),
@@ -172,10 +178,14 @@ export function transformPredictions(apiResponse: unknown): PredictionTimelineDa
   const preds = resp.data ?? [];
   if (!Array.isArray(preds)) return { predictions: [] };
 
-  // Cache for simulation card enrichment + faction graph
-  cachedPredictions = preds;
+  // Filter out non-English predictions (e.g. Chinese from early MiroFish runs)
+  const CJK = /[\u4e00-\u9fff]/;
+  const englishPreds = preds.filter((p) => !CJK.test(p.summary ?? ''));
 
-  const points: PredictionPoint[] = preds.map((p) => ({
+  // Cache for simulation card enrichment + faction graph
+  cachedPredictions = englishPreds;
+
+  const points: PredictionPoint[] = englishPreds.map((p) => ({
     id: p.id,
     simulationId: p.simulationId,
     theater: p.theater,
@@ -191,9 +201,49 @@ export function transformPredictions(apiResponse: unknown): PredictionTimelineDa
   return { predictions: points };
 }
 
+/** Build faction graph from theater + prediction type structure (when no faction strings exist) */
+function buildTheaterGraph(preds: ApiPrediction[]): FactionGraphData {
+  const nodes: FactionNode[] = [];
+  const edges: FactionEdge[] = [];
+  const theaterMap = new Map<string, Map<string, number>>();
+
+  for (const p of preds) {
+    const theater = p.theater || 'Unknown';
+    const pType = p.predictionType || 'unknown';
+    if (!theaterMap.has(theater)) theaterMap.set(theater, new Map());
+    const types = theaterMap.get(theater)!;
+    types.set(pType, (types.get(pType) ?? 0) + 1);
+  }
+
+  let idx = 0;
+  for (const [theater, types] of theaterMap) {
+    const theaterId = `theater-${idx++}`;
+    nodes.push({ id: theaterId, name: theater, memberCount: 600, stance: 'neutral', keyAgents: [] });
+    const typeNodeIds: string[] = [];
+    for (const [type, count] of types) {
+      const typeId = `type-${idx++}`;
+      typeNodeIds.push(typeId);
+      nodes.push({ id: typeId, name: formatType(type), memberCount: 200 + count * 150, stance: supportingStance(type), keyAgents: [] });
+      edges.push({ source: theaterId, target: typeId, weight: 0.6 });
+    }
+    for (let i = 0; i < typeNodeIds.length; i++) {
+      for (let j = i + 1; j < typeNodeIds.length; j++) {
+        edges.push({ source: typeNodeIds[i], target: typeNodeIds[j], weight: 0.3 });
+      }
+    }
+  }
+  return { nodes, edges };
+}
+
 /** Derive faction graph data from predictions */
 export function transformFactions(preds: ApiPrediction[]): FactionGraphData {
   if (preds.length === 0) return { nodes: [], edges: [] };
+
+  // Check if any prediction has real faction data
+  const hasFactionData = preds.some((p) =>
+    parseFactions(p.supportingFactions).length > 0 || parseFactions(p.dissentingFactions).length > 0,
+  );
+  if (!hasFactionData) return buildTheaterGraph(preds);
 
   const factionMap = new Map<string, { stance: FactionStance; count: number }>();
 
