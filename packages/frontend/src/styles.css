@@ -483,9 +483,9 @@ body::before {
 .report-content .report-evidence {
   border-left: 3px solid var(--sienna);
   margin: 14px 0;
-  padding: 12px 20px 12px 18px;
+  padding: 14px 22px 14px 20px;
   background: var(--sienna-light);
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text-secondary);
   font-style: italic;
   font-family: var(--font-display);
