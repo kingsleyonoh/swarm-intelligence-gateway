@@ -33,8 +33,8 @@ export interface ApiPrediction {
   summary: string;
   confidence: number | string;
   timeHorizon: string;
-  supportingFactions?: string;
-  dissentingFactions?: string;
+  supportingFactions?: string | string[];
+  dissentingFactions?: string | string[];
   createdAt: string;
 }
 
@@ -69,6 +69,13 @@ function dissentingStance(predictionType: string): FactionStance {
   if (predictionType === 'escalation') return 'de_escalate';
   if (predictionType === 'de_escalation') return 'escalate';
   return 'uncertain';
+}
+
+/** Normalize factions field — API returns string (comma-separated) or array */
+function parseFactions(raw: string | string[] | undefined | null): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map((s) => String(s).trim()).filter(Boolean);
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
 /** Derive faction split from prediction types instead of hardcoding */
@@ -107,9 +114,7 @@ export function getCachedPredictions(): ApiPrediction[] {
 /** Build debate posts from predictions for a simulation */
 function buildDebatePosts(preds: ApiPrediction[]): AgentDebatePost[] {
   return preds.slice(0, 5).map((p, i) => {
-    const factions = p.supportingFactions
-      ? p.supportingFactions.split(',').map((s) => s.trim())
-      : [];
+    const factions = parseFactions(p.supportingFactions);
     const faction = factions[0] ?? 'Unknown';
     return {
       agentId: `agent-${p.id}-${i}`,
@@ -178,8 +183,8 @@ export function transformPredictions(apiResponse: unknown): PredictionTimelineDa
     summary: p.summary ?? '',
     confidence: typeof p.confidence === 'string' ? parseFloat(p.confidence) : p.confidence,
     timeHorizon: p.timeHorizon ?? '72h',
-    supportingFactions: p.supportingFactions ? p.supportingFactions.split(',').map((s: string) => s.trim()) : [],
-    dissentingFactions: p.dissentingFactions ? p.dissentingFactions.split(',').map((s: string) => s.trim()) : [],
+    supportingFactions: parseFactions(p.supportingFactions),
+    dissentingFactions: parseFactions(p.dissentingFactions),
     createdAt: p.createdAt,
   }));
 
@@ -193,12 +198,8 @@ export function transformFactions(preds: ApiPrediction[]): FactionGraphData {
   const factionMap = new Map<string, { stance: FactionStance; count: number }>();
 
   for (const pred of preds) {
-    const supporting = pred.supportingFactions
-      ? pred.supportingFactions.split(',').map((s) => s.trim()).filter(Boolean)
-      : [];
-    const dissenting = pred.dissentingFactions
-      ? pred.dissentingFactions.split(',').map((s) => s.trim()).filter(Boolean)
-      : [];
+    const supporting = parseFactions(pred.supportingFactions);
+    const dissenting = parseFactions(pred.dissentingFactions);
 
     for (const name of supporting) {
       if (!factionMap.has(name)) {
@@ -237,10 +238,10 @@ function buildFactionEdges(preds: ApiPrediction[], nodes: FactionNode[]): Factio
   for (const pred of preds) {
     const allFactions: string[] = [];
     if (pred.supportingFactions) {
-      allFactions.push(...pred.supportingFactions.split(',').map((s) => s.trim()).filter(Boolean));
+      allFactions.push(...parseFactions(pred.supportingFactions));
     }
     if (pred.dissentingFactions) {
-      allFactions.push(...pred.dissentingFactions.split(',').map((s) => s.trim()).filter(Boolean));
+      allFactions.push(...parseFactions(pred.dissentingFactions));
     }
     for (let i = 0; i < allFactions.length; i++) {
       for (let j = i + 1; j < allFactions.length; j++) {
