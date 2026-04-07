@@ -12,13 +12,16 @@ const PREDICTION_COLORS: Record<string, string> = {
   sentiment_cascade: '#9b59b6',
 };
 
-/** Convert simple Markdown subset to HTML (headings, blockquotes, bold, hr) */
+const CJK = /[\u4e00-\u9fff]/;
+
+/** Convert simple Markdown subset to HTML, filtering out Chinese-text lines */
 function markdownToHtml(md: string): string {
   return md
     .split('\n')
     .map((line) => {
       const trimmed = line.trim();
       if (!trimmed) return '';
+      if (CJK.test(trimmed)) return ''; // Skip Chinese text from mixed-language reports
       if (trimmed === '---') return '<hr>';
       if (trimmed.startsWith('## ')) return `<h3>${esc(trimmed.slice(3))}</h3>`;
       if (trimmed.startsWith('# ')) return `<h2>${esc(trimmed.slice(2))}</h2>`;
@@ -127,9 +130,10 @@ export function createReportView(
       // Render report markdown
       content.innerHTML = markdownToHtml(data.report);
 
-      // Append predictions summary
-      if (data.predictions.length > 0) {
-        container.appendChild(buildPredictionsSummary(data.predictions));
+      // Append predictions summary (filter out Chinese-text predictions)
+      const englishPreds = data.predictions.filter((p) => !CJK.test(p.summary ?? ''));
+      if (englishPreds.length > 0) {
+        container.appendChild(buildPredictionsSummary(englishPreds));
       }
     })
     .catch((err) => {
