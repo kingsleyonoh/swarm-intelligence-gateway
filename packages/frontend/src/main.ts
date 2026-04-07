@@ -125,6 +125,12 @@ if (isDemoMode) {
 }
 
 // Phase 8: Ready
+const modeBadge = document.getElementById('mode-badge');
+if (modeBadge) {
+  modeBadge.textContent = isDemoMode ? 'Demo' : 'Live';
+  if (!isDemoMode) modeBadge.style.borderColor = 'var(--accent)';
+}
+
 console.info(
   `[swarm] Boot complete. Variant: ${swarmVariant.name}. ` +
     `Panels: ${panels.length}, Layers: ${layers.length}, Demo: ${isDemoMode}`,

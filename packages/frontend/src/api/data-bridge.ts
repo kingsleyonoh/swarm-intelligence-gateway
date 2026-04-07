@@ -54,13 +54,28 @@ function inferDomain(theater: string): TheaterDomain {
   return 'political';
 }
 
+// Cache predictions for enriching simulation cards
+let cachedPredictions: ApiPrediction[] = [];
+
 function transformSimulations(apiResponse: unknown): TheaterCardData[] {
   const resp = apiResponse as { data?: ApiSimulation[] };
   const sims = resp.data ?? [];
   if (!Array.isArray(sims)) return [];
 
   return sims.map((sim) => {
-    const conf = 0.75; // default — real confidence comes from predictions
+    // Find predictions for this simulation
+    const simPreds = cachedPredictions.filter((p) => p.simulationId === sim.id);
+    const topPred = simPreds.sort((a, b) => {
+      const ca = typeof a.confidence === 'string' ? parseFloat(a.confidence) : a.confidence;
+      const cb = typeof b.confidence === 'string' ? parseFloat(b.confidence) : b.confidence;
+      return cb - ca;
+    })[0];
+
+    const theater = topPred?.theater ?? 'Simulation Theater';
+    const conf = topPred
+      ? (typeof topPred.confidence === 'string' ? parseFloat(topPred.confidence) : topPred.confidence)
+      : 0.75;
+
     const factionSplit: FactionSplitSegment[] = [
       { stance: 'escalate', label: 'Hawks', percentage: 45 },
       { stance: 'de_escalate', label: 'Moderates', percentage: 35 },
@@ -69,12 +84,12 @@ function transformSimulations(apiResponse: unknown): TheaterCardData[] {
 
     return {
       id: sim.id,
-      theater: sim.report?.match(/(?:Strait of Hormuz|Middle East|Eastern Europe|South China Sea|West Africa|Central Asia|Persian Gulf)/i)?.[0] ?? 'Global Theater',
-      domain: inferDomain(sim.report ?? ''),
+      theater,
+      domain: inferDomain(theater),
       agentCount: sim.agentCount ?? 4096,
       currentRound: sim.status === 'completed' ? (sim.roundCount ?? 5) : 0,
       totalRounds: sim.roundCount ?? 5,
-      topPrediction: sim.report?.slice(0, 150)?.replace(/#/g, '').trim() ?? 'Simulation completed',
+      topPrediction: topPred?.summary?.slice(0, 150) ?? 'Simulation completed — awaiting prediction analysis',
       confidence: conf,
       factionSplit,
       agentDebate: [],
@@ -86,6 +101,9 @@ function transformPredictions(apiResponse: unknown): PredictionTimelineData {
   const resp = apiResponse as { data?: ApiPrediction[] };
   const preds = resp.data ?? [];
   if (!Array.isArray(preds)) return { predictions: [] };
+
+  // Cache for simulation card enrichment
+  cachedPredictions = preds;
 
   const points: PredictionPoint[] = preds.map((p) => ({
     id: p.id,
