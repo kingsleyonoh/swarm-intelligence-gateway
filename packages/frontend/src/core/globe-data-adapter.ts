@@ -23,22 +23,26 @@ const SIZE_RANGE = 1.2;
  * Skips predictions whose theater cannot be resolved to coordinates.
  * Applies jitter to markers that share the same coordinates.
  */
+/**
+ * Group predictions by theater, keep only the highest confidence per theater.
+ * This prevents flickering tooltips from duplicate markers at the same location.
+ */
 export function predictionsToMarkers(
   predictions: PredictionPoint[],
 ): GlobeMarker[] {
-  const markers: GlobeMarker[] = [];
-  const coordCounts = new Map<string, number>();
+  // Group by theater — keep the highest confidence prediction per theater
+  const byTheater = new Map<string, PredictionPoint>();
+  for (const p of predictions) {
+    const existing = byTheater.get(p.theater);
+    if (!existing || p.confidence > existing.confidence) {
+      byTheater.set(p.theater, p);
+    }
+  }
 
-  for (const prediction of predictions) {
+  const markers: GlobeMarker[] = [];
+  for (const prediction of byTheater.values()) {
     const coords = resolveTheaterCoords(prediction.theater);
     if (!coords) continue;
-
-    const coordKey = `${coords.lat},${coords.lng}`;
-    const count = coordCounts.get(coordKey) ?? 0;
-    coordCounts.set(coordKey, count + 1);
-
-    const jitteredLat = applyJitter(coords.lat, count);
-    const jitteredLng = applyJitter(coords.lng, count);
 
     const color = PREDICTION_TYPE_COLORS[prediction.predictionType];
     const size = MIN_SIZE + prediction.confidence * SIZE_RANGE;
@@ -47,8 +51,8 @@ export function predictionsToMarkers(
 
     markers.push({
       id: prediction.id,
-      lat: jitteredLat,
-      lng: jitteredLng,
+      lat: coords.lat,
+      lng: coords.lng,
       label,
       color,
       size,

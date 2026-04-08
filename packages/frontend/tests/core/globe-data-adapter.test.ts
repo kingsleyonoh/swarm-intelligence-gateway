@@ -120,18 +120,14 @@ describe('predictionsToMarkers', () => {
     expect(markers[0].label).toContain('85%');
   });
 
-  it('should jitter duplicate coordinates', () => {
-    const pred1 = makePrediction({ id: 'p1' });
-    const pred2 = makePrediction({ id: 'p2' });
+  it('should deduplicate same-theater predictions keeping highest confidence', () => {
+    const pred1 = makePrediction({ id: 'p1', confidence: 0.6 });
+    const pred2 = makePrediction({ id: 'p2', confidence: 0.9 });
 
     const markers = predictionsToMarkers([pred1, pred2]);
 
-    expect(markers).toHaveLength(2);
-    // At least one coordinate should differ due to jitter
-    const sameCoords =
-      markers[0].lat === markers[1].lat &&
-      markers[0].lng === markers[1].lng;
-    expect(sameCoords).toBe(false);
+    expect(markers).toHaveLength(1);
+    expect(markers[0].id).toBe('p2'); // higher confidence wins
   });
 
   it('should handle multiple predictions across different theaters', () => {
