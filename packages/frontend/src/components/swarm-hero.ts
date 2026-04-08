@@ -29,7 +29,9 @@ const PHASE_LABELS: Record<string, string> = {
 
 export interface SwarmHeroController {
   /** Switch to live mode with real simulation data */
-  setLive(phase: string, elapsedMs: number): void;
+  setLive(phase: string, elapsedMs: number, topic?: string): void;
+  /** Update the displayed topic (from intelligence feed or scenario) */
+  setTopic(topic: string): void;
   /** Switch back to demo loop */
   setDemo(): void;
   destroy(): void;
@@ -51,6 +53,11 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
   phaseLabel.className = 'swarm-hero-phase';
   phaseLabel.textContent = PHASE_LABELS.graph_building;
   overlay.appendChild(phaseLabel);
+
+  const topicEl = document.createElement('div');
+  topicEl.className = 'swarm-hero-topic';
+  topicEl.textContent = '';
+  overlay.appendChild(topicEl);
 
   const subtitle = document.createElement('div');
   subtitle.className = 'swarm-hero-subtitle';
@@ -103,7 +110,7 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
   demoTimer = setTimeout(advanceDemo, DEMO_TIMING[0].durationMs);
 
   return {
-    setLive(phase: string, elapsedMs: number): void {
+    setLive(phase: string, elapsedMs: number, topic?: string): void {
       if (!isLive) {
         isLive = true;
         clearDemoTimer();
@@ -113,6 +120,11 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
       phaseLabel.textContent = PHASE_LABELS[phase] ?? phase;
       elapsed.textContent = formatElapsed(elapsedMs);
       subtitle.textContent = 'LIVE — 4,096 AI agents deliberating';
+      if (topic) topicEl.textContent = topic;
+    },
+
+    setTopic(topic: string): void {
+      topicEl.textContent = topic;
     },
 
     setDemo(): void {

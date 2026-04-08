@@ -83,19 +83,38 @@ if (panelContainer) {
   swarmHero = createSwarmHero(heroContainer);
 
   // Wire swarm hero to real simulation status
+  let lastActiveSimId = '';
   document.addEventListener('simulation-active', ((e: Event) => {
-    const detail = (e as CustomEvent<{ id: string; status: string }>).detail;
+    const detail = (e as CustomEvent<{ id: string; status: string; theater: string }>).detail;
     if (detail && swarmHero) {
-      // Fetch real progress for elapsed time
       const base = swarmVariant.apiBaseUrl || window.location.origin;
       const key = (import.meta as unknown as Record<string, Record<string, string>>).env?.VITE_API_KEY ?? '';
+      // Fetch progress for elapsed time
       fetch(`${base}/api/simulations/${detail.id}/progress`, {
         headers: { 'X-API-Key': key },
       }).then((r) => r.json()).then((prog: { elapsedMs?: number; status?: string }) => {
-        swarmHero?.setLive(prog.status ?? detail.status, prog.elapsedMs ?? 0);
+        const topic = detail.theater !== 'Simulation Theater' ? `ANALYZING: ${detail.theater}` : '';
+        swarmHero?.setLive(prog.status ?? detail.status, prog.elapsedMs ?? 0, topic);
       }).catch(() => {
         swarmHero?.setLive(detail.status, 0);
       });
+      // Fetch scenario title once per simulation
+      if (detail.id !== lastActiveSimId) {
+        lastActiveSimId = detail.id;
+        fetch(`${base}/api/simulations/${detail.id}`, {
+          headers: { 'X-API-Key': key },
+        }).then((r) => r.json()).then((sim: { scenarioId?: string }) => {
+          if (sim.scenarioId) {
+            fetch(`${base}/api/scenarios/${sim.scenarioId}`, {
+              headers: { 'X-API-Key': key },
+            }).then((r2) => r2.json()).then((scenario: { title?: string }) => {
+              if (scenario.title) {
+                swarmHero?.setTopic(`ANALYZING: ${scenario.title}`);
+              }
+            }).catch(() => { /* ignore */ });
+          }
+        }).catch(() => { /* ignore */ });
+      }
     }
   }) as EventListener);
 

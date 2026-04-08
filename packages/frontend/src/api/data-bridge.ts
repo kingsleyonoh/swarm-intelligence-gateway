@@ -107,7 +107,7 @@ export class DataBridge {
           const activeSim = cards.find((c) => ACTIVE.has(c.status ?? ''));
           if (activeSim) {
             document.dispatchEvent(new CustomEvent('simulation-active', {
-              detail: { id: activeSim.id, status: activeSim.status },
+              detail: { id: activeSim.id, status: activeSim.status, theater: activeSim.theater },
             }));
           } else {
             document.dispatchEvent(new CustomEvent('simulation-idle'));
