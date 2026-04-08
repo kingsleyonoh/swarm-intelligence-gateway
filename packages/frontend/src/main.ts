@@ -134,7 +134,7 @@ selectorContainer.id = 'scenario-selector-mount';
 if (panelContainer) {
   panelContainer.parentElement?.insertBefore(selectorContainer, panelContainer);
 }
-const scenarioSelector = createScenarioSelector(selectorContainer, (templateId) => {
+const scenarioSelector = createScenarioSelector(selectorContainer, (selectedId) => {
   const base = swarmVariant.apiBaseUrl || window.location.origin;
   const key = (import.meta as unknown as Record<string, Record<string, string>>).env?.VITE_API_KEY ?? '';
   if (!key) {
@@ -143,17 +143,26 @@ const scenarioSelector = createScenarioSelector(selectorContainer, (templateId) 
     return;
   }
   scenarioSelector.setLoading(true);
-  fetch(`${base}/api/simulations/launch`, {
+
+  // Check if this is a real scenario (scenario:UUID) or a template
+  const isRealScenario = selectedId.startsWith('scenario:');
+  const url = isRealScenario
+    ? `${base}/api/simulations`
+    : `${base}/api/simulations/launch`;
+  const body = isRealScenario
+    ? { scenarioId: selectedId.replace('scenario:', ''), agentCount: 4096, roundCount: 5 }
+    : { templateId: selectedId };
+
+  fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
-    body: JSON.stringify({ templateId }),
+    body: JSON.stringify(body),
   })
     .then((r) => r.json())
-    .then((data: { simulationId?: string; template?: { label?: string } }) => {
+    .then((data: { simulationId?: string }) => {
       if (data.simulationId) {
         console.info(`[swarm] Simulation launched: ${data.simulationId}`);
       }
-      // Keep loading state for 3s then reset so polling picks up the simulation
       setTimeout(() => scenarioSelector.setLoading(false), 3000);
     })
     .catch((err) => {
@@ -162,30 +171,39 @@ const scenarioSelector = createScenarioSelector(selectorContainer, (templateId) 
     });
 });
 
-// Load scenario templates (public endpoint, no auth needed)
+// Load latest WorldMonitor scenario + pre-built templates
 const templateBaseUrl = swarmVariant.apiBaseUrl || window.location.origin;
-fetch(`${templateBaseUrl}/api/scenarios/templates`)
-  .then((r) => r.json())
-  .then((data: { templates?: Array<{ id: string; label: string; category: string }> }) => {
-    if (data.templates) {
-      scenarioSelector.setOptions(data.templates);
-    }
-  })
-  .catch(() => {
-    // Fallback: hardcoded template list if API unreachable
-    scenarioSelector.setOptions([
-      { id: 'south-china-sea', label: 'South China Sea -- Naval Standoff', category: 'military' },
-      { id: 'taiwan-strait', label: 'Taiwan Strait -- Semiconductor Crisis', category: 'market' },
-      { id: 'eastern-europe', label: 'Eastern Europe -- NATO-Russia Tensions', category: 'political' },
-      { id: 'red-sea', label: 'Red Sea -- Shipping Crisis', category: 'military' },
-      { id: 'persian-gulf', label: 'Persian Gulf -- Oil Market Shock', category: 'market' },
-      { id: 'korean-peninsula', label: 'Korean Peninsula -- Missile Crisis', category: 'military' },
-      { id: 'arctic', label: 'Arctic -- Great Power Competition', category: 'political' },
-      { id: 'sahel', label: 'Sahel -- Instability Cascade', category: 'political' },
-      { id: 'cyber-global', label: 'Global Cyber Threat Landscape', category: 'cyber' },
-      { id: 'global-economy', label: 'Global Economic Realignment', category: 'market' },
-    ]);
-  });
+const viteApiKey = (import.meta as unknown as Record<string, Record<string, string>>).env?.VITE_API_KEY ?? '';
+
+Promise.all([
+  // Fetch latest real scenario from WorldMonitor
+  viteApiKey
+    ? fetch(`${templateBaseUrl}/api/scenarios?limit=1`, {
+        headers: { 'X-API-Key': viteApiKey },
+      }).then((r) => r.json()).catch(() => ({ data: [] }))
+    : Promise.resolve({ data: [] }),
+  // Fetch pre-built templates
+  fetch(`${templateBaseUrl}/api/scenarios/templates`)
+    .then((r) => r.json()).catch(() => ({ templates: [] })),
+]).then(([scenarioResp, templateResp]) => {
+  const options: Array<{ id: string; label: string; category: string }> = [];
+
+  // Add latest WorldMonitor scenario as primary option
+  const scenarios = (scenarioResp as { data?: Array<{ id: string; title: string }> }).data ?? [];
+  if (scenarios.length > 0) {
+    options.push({
+      id: `scenario:${scenarios[0].id}`,
+      label: `LATEST: ${scenarios[0].title}`,
+      category: 'live',
+    });
+  }
+
+  // Add pre-built templates
+  const templates = (templateResp as { templates?: Array<{ id: string; label: string; category: string }> }).templates ?? [];
+  for (const t of templates) options.push(t);
+
+  scenarioSelector.setOptions(options);
+});
 
 // Phase 5b: Mount panels into the panel container
 if (panelContainer) {

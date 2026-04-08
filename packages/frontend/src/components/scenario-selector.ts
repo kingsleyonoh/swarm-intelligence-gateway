@@ -21,6 +21,7 @@ export interface ScenarioSelectorController {
 }
 
 const CATEGORY_PREFIX: Record<string, string> = {
+  live: '[LIVE]',
   military: '[MILITARY]',
   market: '[MARKET]',
   cyber: '[CYBER]',
