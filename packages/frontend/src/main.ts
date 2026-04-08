@@ -107,10 +107,11 @@ if (panelContainer) {
           if (sim.scenarioId) {
             fetch(`${base}/api/scenarios/${sim.scenarioId}`, {
               headers: { 'X-API-Key': key },
-            }).then((r2) => r2.json()).then((scenario: { title?: string }) => {
-              if (scenario.title) {
-                swarmHero?.setTopic(`ANALYZING: ${scenario.title}`);
-              }
+            }).then((r2) => r2.json()).then((scenario: { title?: string; theaters?: { label?: string }[] }) => {
+              // Use first theater label (more descriptive) or fall back to title
+              const topTheater = scenario.theaters?.[0]?.label;
+              const topic = topTheater ?? scenario.title ?? '';
+              if (topic) swarmHero?.setTopic(topic);
             }).catch(() => { /* ignore */ });
           }
         }).catch(() => { /* ignore */ });
