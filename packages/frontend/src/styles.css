@@ -211,9 +211,7 @@ body::after {
 }
 
 #swarm-hero-mount {
-  margin: 0 auto;
-  max-width: 1440px;
-  padding: 0 40px;
+  width: 100%;
 }
 
 /* ── Globe Container ─────────────────────────────────────────────── */

@@ -55,13 +55,13 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
   wrapper.appendChild(overlay);
   container.appendChild(wrapper);
 
-  // Initialize canvas sized to wrapper
-  const w = wrapper.clientWidth || 800;
-  const h = 200;
+  // Initialize canvas sized to wrapper — tall and full-width for visual impact
+  const w = wrapper.clientWidth || 1400;
+  const h = 340;
   canvasWrap.style.height = `${h}px`;
 
   let canvas: SwarmCanvasController | null = createSwarmCanvas(canvasWrap, {
-    particleCount: 180,
+    particleCount: 250,
     width: w,
     height: h,
     phase: 'graph_building',
@@ -82,7 +82,7 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
     if (phaseIdx === 0) {
       canvas.destroy();
       canvas = createSwarmCanvas(canvasWrap, {
-        particleCount: 180,
+        particleCount: 250,
         width: w,
         height: h,
         phase: 'graph_building',
