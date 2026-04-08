@@ -13,8 +13,10 @@ import {
   createConfidenceGauge,
   createFactionSplitBar,
   createSimulationPulse,
+  createLiveProgress,
 } from './theater-helpers.js';
 import { createReportView } from './report-view.js';
+import { ProgressPoller } from './progress-poller.js';
 
 export interface TheaterPanelConfig {
   apiKey: string;
@@ -32,10 +34,12 @@ export class SwarmTheaterPanel implements Panel {
   private activeFilter: 'all' | TheaterDomain = 'all';
   private expandedCardId: string | null = null;
   private apiConfig: TheaterPanelConfig = { apiKey: '', apiBaseUrl: '' };
+  private poller = new ProgressPoller({ apiBaseUrl: '', apiKey: '' });
 
   /** Set API credentials for report fetching (called from main.ts after creation) */
   setApiConfig(config: TheaterPanelConfig): void {
     this.apiConfig = config;
+    this.poller.setConfig(config);
   }
 
   mount(container: HTMLElement): void {
@@ -47,6 +51,7 @@ export class SwarmTheaterPanel implements Panel {
   }
 
   unmount(): void {
+    this.poller.clearAll();
     if (this.container) {
       this.container.innerHTML = '';
     }
@@ -58,6 +63,7 @@ export class SwarmTheaterPanel implements Panel {
 
   update(data: unknown): void {
     if (!Array.isArray(data)) return;
+    this.poller.clearAll();
     this.cards = data as TheaterCardData[];
     this.expandedCardId = null;
     this.renderCards();
@@ -153,11 +159,19 @@ export class SwarmTheaterPanel implements Panel {
     card.dataset.domain = data.domain;
     card.dataset.cardId = data.id;
 
-    // Pulse indicator for active simulations
-    const pulse = createSimulationPulse(data.status);
-    if (pulse) {
+    // Live progress indicator for active simulations
+    const liveEl = createLiveProgress(data.status ?? '');
+    if (liveEl) {
       card.classList.add('theater-card--simulating');
-      card.appendChild(pulse);
+      card.appendChild(liveEl);
+      this.poller.start(data.id, card);
+    } else {
+      // Fallback to simple pulse for any status not handled by live progress
+      const pulse = createSimulationPulse(data.status);
+      if (pulse) {
+        card.classList.add('theater-card--simulating');
+        card.appendChild(pulse);
+      }
     }
 
     // Prediction type badge + confidence — the hero
@@ -229,23 +243,6 @@ export class SwarmTheaterPanel implements Panel {
     return `${days}d ago`;
   }
 
-  private buildProgressBar(data: TheaterCardData): HTMLElement {
-    const bar = document.createElement('div');
-    bar.className = 'round-progress-bar';
-
-    const fill = document.createElement('div');
-    fill.className = 'round-progress-fill';
-    const pct =
-      data.totalRounds > 0
-        ? Math.round((data.currentRound / data.totalRounds) * 100)
-        : 0;
-    fill.style.width = `${pct}%`;
-    fill.style.transition = 'width 0.5s ease';
-    bar.appendChild(fill);
-
-    return bar;
-  }
-
   private expandCard(cardId: string): void {
     this.expandedCardId = cardId;
     this.showDebateFeed();
@@ -290,4 +287,5 @@ export class SwarmTheaterPanel implements Panel {
     }
     if (this.filterBarEl) this.filterBarEl.style.display = '';
   }
+
 }

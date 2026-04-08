@@ -162,6 +162,72 @@ export function createSimulationPulse(status: string | undefined): HTMLElement |
   return wrapper;
 }
 
+/** Format elapsed milliseconds as a human-readable string (e.g. "2m 5s") */
+export function formatElapsed(ms: number): string {
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const remainSecs = secs % 60;
+  return `${mins}m ${remainSecs}s`;
+}
+
+/**
+ * Create a live progress indicator with phase label, elapsed time, and
+ * an indeterminate progress bar for active processing phases.
+ * Returns null for terminal states (completed, failed, cancelled).
+ */
+export function createLiveProgress(
+  status: string,
+  elapsedMs?: number,
+): HTMLElement | null {
+  const ACTIVE_PHASES: Record<string, string> = {
+    pending: 'QUEUED',
+    queued: 'QUEUED',
+    graph_building: 'BUILDING GRAPH',
+    simulating: 'RUNNING SWARM',
+    reporting: 'GENERATING REPORT',
+  };
+
+  const label = ACTIVE_PHASES[status];
+  if (!label) return null;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'live-progress';
+
+  const dot = document.createElement('span');
+  dot.className = 'sim-pulse-dot';
+  wrapper.appendChild(dot);
+
+  const text = document.createElement('span');
+  text.className = 'live-progress-label';
+  text.textContent = label;
+  wrapper.appendChild(text);
+
+  if (elapsedMs != null && elapsedMs > 0) {
+    const time = document.createElement('span');
+    time.className = 'live-progress-time';
+    time.textContent = formatElapsed(elapsedMs);
+    wrapper.appendChild(time);
+  }
+
+  // Phase-specific progress bar for processing phases
+  if (
+    status === 'simulating' ||
+    status === 'graph_building' ||
+    status === 'reporting'
+  ) {
+    const bar = document.createElement('div');
+    bar.className = 'live-progress-bar';
+    const fill = document.createElement('div');
+    fill.className = 'live-progress-fill';
+    fill.style.animation = 'progress-indeterminate 2s ease-in-out infinite';
+    bar.appendChild(fill);
+    wrapper.appendChild(bar);
+  }
+
+  return wrapper;
+}
+
 /** Create the debate feed view with virtual scroll (max 50 visible) */
 export function createDebateFeed(
   posts: AgentDebatePost[],
