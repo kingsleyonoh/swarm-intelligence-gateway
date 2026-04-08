@@ -9,8 +9,9 @@
  *   POST /api/simulations/:id/cancel   — cancel a running simulation
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, gt } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 
 import { db } from '../../shared/db.js';
 import {
@@ -19,7 +20,12 @@ import {
   ValidationError,
 } from '../../shared/errors.js';
 import { uuidSchema } from '../../shared/validation.js';
-import { predictions, simulations } from '../../db/schema/tables.js';
+import {
+  agentEpisodes,
+  agentProfiles,
+  predictions,
+  simulations,
+} from '../../db/schema/tables.js';
 import { SIMULATION_STATUS } from '../../config/constants.js';
 import { authGuard, type RequestTenant } from '../middleware/auth.js';
 
@@ -31,9 +37,95 @@ const TERMINAL_STATUSES = new Set<string>([
   SIMULATION_STATUS.CANCELLED,
 ]);
 
+const actionsQuerySchema = z.object({
+  since: z.string().datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
 // ── Routes ──────────────────────────────────────────────────────────────
 
 export async function simulationActionRoutes(app: FastifyInstance): Promise<void> {
+  // ── GET /api/simulations/:id/actions ────────────────────────────────
+  app.get<{ Params: { id: string }; Querystring: { since?: string; limit?: string } }>(
+    '/api/simulations/:id/actions',
+    { preHandler: [authGuard] },
+    async (request, reply) => {
+      const tenant = (request as any).tenant as RequestTenant;
+
+      const idParse = uuidSchema.safeParse(request.params.id);
+      if (!idParse.success) {
+        throw new ValidationError('Invalid simulation id');
+      }
+      const id = idParse.data;
+
+      const queryParse = actionsQuerySchema.safeParse(request.query);
+      if (!queryParse.success) {
+        throw new ValidationError('Invalid query parameters');
+      }
+      const { since, limit } = queryParse.data;
+
+      // Verify simulation exists and belongs to tenant
+      const [sim] = await db
+        .select({ id: simulations.id })
+        .from(simulations)
+        .where(
+          and(eq(simulations.id, id), eq(simulations.tenantId, tenant.id)),
+        );
+
+      if (!sim) {
+        throw new NotFoundError(`Simulation not found: ${id}`);
+      }
+
+      const conditions = [
+        eq(agentEpisodes.simulationId, id),
+        eq(agentEpisodes.tenantId, tenant.id),
+      ];
+      if (since) {
+        conditions.push(gt(agentEpisodes.createdAt, new Date(since)));
+      }
+
+      const rows = await db
+        .select({
+          id: agentEpisodes.id,
+          agentId: agentEpisodes.agentId,
+          roundNumber: agentEpisodes.roundNumber,
+          actionType: agentEpisodes.actionType,
+          content: agentEpisodes.content,
+          createdAt: agentEpisodes.createdAt,
+          username: agentProfiles.username,
+          stance: agentProfiles.stance,
+        })
+        .from(agentEpisodes)
+        .leftJoin(
+          agentProfiles,
+          and(
+            eq(agentProfiles.simulationId, agentEpisodes.simulationId),
+            eq(agentProfiles.agentId, agentEpisodes.agentId),
+          ),
+        )
+        .where(and(...conditions))
+        .orderBy(desc(agentEpisodes.createdAt))
+        .limit(limit + 1);
+
+      const hasMore = rows.length > limit;
+      const data = hasMore ? rows.slice(0, limit) : rows;
+
+      return reply.send({
+        data: data.map((row) => ({
+          id: row.id,
+          agentId: row.agentId,
+          username: row.username ?? `Agent-${row.agentId}`,
+          stance: row.stance ?? 'neutral',
+          roundNumber: row.roundNumber,
+          actionType: row.actionType,
+          content: row.content,
+          createdAt: row.createdAt,
+        })),
+        hasMore,
+      });
+    },
+  );
+
   // ── GET /api/simulations/:id/report ─────────────────────────────────
   // Registered BEFORE /:id so Fastify matches the longer path first.
   app.get<{ Params: { id: string } }>(

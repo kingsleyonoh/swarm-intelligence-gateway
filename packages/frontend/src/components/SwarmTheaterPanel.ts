@@ -16,6 +16,7 @@ import {
   createLiveProgress,
 } from './theater-helpers.js';
 import { createReportView } from './report-view.js';
+import { createLiveFeed } from './live-feed.js';
 import { ProgressPoller } from './progress-poller.js';
 
 export interface TheaterPanelConfig {
@@ -258,25 +259,44 @@ export class SwarmTheaterPanel implements Panel {
     if (this.filterBarEl) this.filterBarEl.style.display = 'none';
 
     // Remove any existing view
-    const existing = this.container.querySelector('.report-view') ?? this.container.querySelector('.debate-feed');
+    const existing = this.container.querySelector('.report-view')
+      ?? this.container.querySelector('.live-feed')
+      ?? this.container.querySelector('.debate-feed');
     if (existing) existing.remove();
 
-    const view = createReportView(
-      cardData.id,
-      cardData.theater,
-      this.apiConfig.apiKey,
-      this.apiConfig.apiBaseUrl,
-      () => { this.expandedCardId = null; this.showGridView(); },
-    );
+    const ACTIVE_STATUSES = new Set([
+      'pending', 'queued', 'graph_building', 'simulating', 'reporting',
+    ]);
+    const isActive = ACTIVE_STATUSES.has(cardData.status ?? '');
 
-    this.container.appendChild(view);
+    if (isActive) {
+      const feed = createLiveFeed(
+        cardData.id,
+        cardData.theater,
+        this.apiConfig.apiKey,
+        this.apiConfig.apiBaseUrl,
+        () => { this.expandedCardId = null; this.showGridView(); },
+      );
+      this.container.appendChild(feed);
+    } else {
+      const view = createReportView(
+        cardData.id,
+        cardData.theater,
+        this.apiConfig.apiKey,
+        this.apiConfig.apiBaseUrl,
+        () => { this.expandedCardId = null; this.showGridView(); },
+      );
+      this.container.appendChild(view);
+    }
   }
 
   private showGridView(): void {
     if (!this.container) return;
 
-    // Remove report/debate view
-    const view = this.container.querySelector('.report-view') ?? this.container.querySelector('.debate-feed');
+    // Remove report/debate/live-feed view
+    const view = this.container.querySelector('.report-view')
+      ?? this.container.querySelector('.live-feed')
+      ?? this.container.querySelector('.debate-feed');
     if (view) view.remove();
 
     // Restore grid and filter bar
