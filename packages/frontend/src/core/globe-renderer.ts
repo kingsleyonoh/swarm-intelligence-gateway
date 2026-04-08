@@ -71,6 +71,7 @@ export class GlobeRenderer {
   private pointerDownHandler: (() => void) | null = null;
   private pointerUpHandler: (() => void) | null = null;
   private currentMarkers: GlobeMarker[] = [];
+  private newsMarkers: GlobeMarker[] = [];
   private heatmapEnabled = false;
   private heatmapThreshold = 0.5;
 
@@ -103,15 +104,27 @@ export class GlobeRenderer {
     return this.globe !== null;
   }
 
-  /** Update the globe's marker data */
+  /** Update the globe's prediction marker data */
   updateMarkers(markers: GlobeMarker[]): void {
     if (!this.globe) {
       throw new Error('GlobeRenderer not initialized — call init() first');
     }
 
     this.currentMarkers = markers;
-    this.globe.pointsData(markers);
-    this.applyRings();
+    this.applyAllMarkers();
+  }
+
+  /** Update the globe's news/intelligence markers */
+  updateNewsMarkers(markers: GlobeMarker[]): void {
+    this.newsMarkers = markers;
+    this.applyAllMarkers();
+  }
+
+  /** Merge prediction + news markers and update globe */
+  private applyAllMarkers(): void {
+    if (!this.globe) return;
+    this.globe.pointsData([...this.currentMarkers, ...this.newsMarkers]);
+    this.applyRings(); // rings only for prediction markers
   }
 
   /** Toggle heatmap mode — larger, slower rings when enabled */

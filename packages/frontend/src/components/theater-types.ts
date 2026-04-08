@@ -56,4 +56,5 @@ export interface TheaterCardData {
   factionSplit: FactionSplitSegment[];
   agentDebate: AgentDebatePost[];
   status?: string;
+  signalCount?: number;
 }

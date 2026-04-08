@@ -12,6 +12,7 @@ import type { TheaterCardData, FactionSplitSegment, AgentDebatePost, TheaterDoma
 import type { PredictionTimelineData, PredictionPoint } from '../components/prediction-types.js';
 import type { HeatmapPanelData } from '../components/heatmap-types.js';
 import type { FactionGraphData, FactionNode, FactionEdge, FactionStance } from '../components/faction-types.js';
+import type { IntelligenceData, IntelStory, IntelForecast } from '../components/intelligence-types.js';
 
 /** Raw API simulation row */
 export interface ApiSimulation {
@@ -153,6 +154,17 @@ export function transformSimulations(apiResponse: unknown): TheaterCardData[] {
 
     const factionSplit = buildFactionSplit(simPreds);
 
+    // Compute signal count from cached intelligence forecasts
+    const intel = cachedIntelligence;
+    let signalCount = 0;
+    if (intel && intel.forecasts.length > 0) {
+      const theaterLower = theater.toLowerCase();
+      const matched = intel.forecasts.filter(
+        (f) => theaterLower.includes(f.region.toLowerCase()) || f.region.toLowerCase().includes(theaterLower),
+      );
+      signalCount = matched.length > 0 ? matched.length : intel.forecasts.length;
+    }
+
     return {
       id: sim.id,
       theater,
@@ -168,6 +180,7 @@ export function transformSimulations(apiResponse: unknown): TheaterCardData[] {
       factionSplit,
       agentDebate: buildDebatePosts(simPreds),
       status: sim.status,
+      signalCount,
     };
   });
 }
@@ -319,4 +332,30 @@ export function transformHeatmap(apiResponse: unknown): HeatmapPanelData {
   const resp = apiResponse as { data?: ApiPrediction[] };
   const preds = resp.data ?? [];
   return { predictionCount: Array.isArray(preds) ? preds.length : 0 };
+}
+
+// ── Intelligence transforms ──────────────────────────────────────────
+
+/** Cache intelligence for signal count on theater cards */
+let cachedIntelligence: IntelligenceData | null = null;
+
+/** Get the current cached intelligence data */
+export function getCachedIntelligence(): IntelligenceData | null {
+  return cachedIntelligence;
+}
+
+/** Transform raw intelligence API response into typed IntelligenceData */
+export function transformIntelligence(apiResponse: unknown): IntelligenceData {
+  const resp = (apiResponse ?? {}) as {
+    stories?: IntelStory[];
+    forecasts?: IntelForecast[];
+    fetchedAt?: string;
+  };
+  const data: IntelligenceData = {
+    stories: Array.isArray(resp.stories) ? resp.stories : [],
+    forecasts: Array.isArray(resp.forecasts) ? resp.forecasts : [],
+    fetchedAt: resp.fetchedAt ?? new Date().toISOString(),
+  };
+  cachedIntelligence = data;
+  return data;
 }

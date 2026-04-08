@@ -11,13 +11,17 @@ import {
   transformSimulations,
   transformPredictions,
   transformFactions,
+  transformIntelligence,
   getCachedPredictions,
 } from './data-bridge-transforms.js';
+import type { IntelligenceData } from '../components/intelligence-types.js';
+
 export interface DataBridgeConfig {
   apiBaseUrl: string;
   apiKey: string;
   refreshIntervals: RefreshIntervals;
   panels: Map<string, Panel>;
+  tickerController?: { update(data: IntelligenceData): void };
 }
 
 export class DataBridge {
@@ -97,6 +101,26 @@ export class DataBridge {
         panels.get('swarm-theater'),
         transformSimulations,
       ),
+    );
+
+    // Intelligence → Ticker + globe news markers (public, no auth)
+    const tickerCtrl = this.config.tickerController;
+    loops.push(
+      new SmartPollLoop({
+        url: `${base}/api/intelligence`,
+        intervalMs: 30_000,
+        fetchOptions: {},
+        onData: (raw: unknown) => {
+          const intel = transformIntelligence(raw);
+          tickerCtrl?.update(intel);
+          document.dispatchEvent(
+            new CustomEvent('intelligence-updated', { detail: intel }),
+          );
+        },
+        onError: (err: Error) => {
+          console.warn(`[DataBridge] Intelligence poll error: ${err.message}`);
+        },
+      }),
     );
 
     return loops;

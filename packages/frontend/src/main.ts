@@ -28,8 +28,10 @@ import { FactionBoundariesLayer } from './layers/FactionBoundariesLayer.js';
 import { ConsensusHeatLayer } from './layers/ConsensusHeatLayer.js';
 import { DataBridge } from './api/data-bridge.js';
 import { loadDemoData } from './api/demo-loader.js';
+import { createIntelTicker } from './components/intelligence-ticker.js';
 import type { Panel, MapLayerConstructor } from './types.js';
 import type { PredictionPoint } from './components/prediction-types.js';
+import type { IntelligenceData } from './components/intelligence-types.js';
 
 // Phase 1: Initialize registries
 const panelRegistry = new PanelRegistry();
@@ -68,12 +70,19 @@ const PANEL_DESCRIPTIONS: Record<string, string> = {
 // Phase 5a: Mount swarm hero visualization (always-visible demo loop)
 import { createSwarmHero } from './components/swarm-hero.js';
 const panelContainer = document.getElementById('panel-container');
+
+// Mount intelligence ticker between globe and hero
+const tickerContainer = document.createElement('div');
+tickerContainer.id = 'intel-ticker-mount';
 if (panelContainer) {
   const heroContainer = document.createElement('div');
   heroContainer.id = 'swarm-hero-mount';
   panelContainer.parentElement?.insertBefore(heroContainer, panelContainer);
+  // Insert ticker just before the hero
+  panelContainer.parentElement?.insertBefore(tickerContainer, heroContainer);
   createSwarmHero(heroContainer);
 }
+const intelTicker = createIntelTicker(tickerContainer);
 
 // Phase 5b: Mount panels into the panel container
 if (panelContainer) {
@@ -113,7 +122,7 @@ if (globeContainer) {
   }) as EventListener);
 
   import('./core/globe-renderer.js').then(async ({ GlobeRenderer }) => {
-    const { predictionsToMarkers } = await import('./core/globe-data-adapter.js');
+    const { predictionsToMarkers, forecastsToMarkers } = await import('./core/globe-data-adapter.js');
     const renderer = new GlobeRenderer(globeContainer);
     try {
       await renderer.init();
@@ -128,6 +137,14 @@ if (globeContainer) {
         const detail = (e as CustomEvent<PredictionPoint[]>).detail;
         if (detail) {
           renderer.updateMarkers(predictionsToMarkers(detail));
+        }
+      }) as EventListener);
+
+      // Listen for intelligence updates → news markers on globe
+      document.addEventListener('intelligence-updated', ((e: Event) => {
+        const intel = (e as CustomEvent<IntelligenceData>).detail;
+        if (intel?.forecasts) {
+          renderer.updateNewsMarkers(forecastsToMarkers(intel.forecasts));
         }
       }) as EventListener);
 
@@ -178,6 +195,7 @@ if (isDemoMode) {
     apiKey,
     refreshIntervals: swarmVariant.refreshIntervals,
     panels: mountedPanels,
+    tickerController: intelTicker,
   });
   dataBridge.startAll();
 }

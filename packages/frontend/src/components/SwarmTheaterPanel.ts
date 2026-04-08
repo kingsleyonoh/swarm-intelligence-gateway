@@ -224,6 +224,13 @@ export class SwarmTheaterPanel implements Panel {
     freshness.textContent = this.formatFreshness(data.predictedAt);
     meta.appendChild(freshness);
 
+    if (data.signalCount && data.signalCount > 0) {
+      const signals = document.createElement('span');
+      signals.className = 'signal-attribution';
+      signals.textContent = `Based on ${data.signalCount} intelligence signals`;
+      meta.appendChild(signals);
+    }
+
     card.appendChild(meta);
 
     // Faction split bar

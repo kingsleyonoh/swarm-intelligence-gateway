@@ -1483,6 +1483,84 @@ body::after {
   font-style: italic;
 }
 
+/* ── Intelligence Ticker ──────────────────────────────────────────── */
+#intel-ticker-mount { width: 100%; }
+
+.intel-ticker {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  background: var(--header-bg);
+  border-bottom: 1px solid rgba(181, 101, 43, 0.2);
+  overflow: hidden;
+}
+
+.intel-ticker-label {
+  font-family: var(--font-data);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--copper);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 0 16px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(181, 101, 43, 0.2);
+}
+
+.intel-ticker-track { flex: 1; overflow: hidden; }
+
+.intel-ticker-scroll {
+  display: flex;
+  gap: 40px;
+  white-space: nowrap;
+  animation: ticker-scroll 60s linear infinite;
+}
+
+.intel-ticker-scroll:hover { animation-play-state: paused; }
+
+.intel-ticker-item {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: rgba(246, 241, 233, 0.65);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.intel-ticker-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.intel-ticker-dot--critical { background: var(--signal-red); box-shadow: 0 0 6px var(--signal-red); }
+.intel-ticker-dot--warning { background: var(--signal-amber); }
+.intel-ticker-dot--info { background: var(--signal-blue); }
+
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.intel-ticker-placeholder {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: rgba(246, 241, 233, 0.25);
+  letter-spacing: 1px;
+  padding: 0 16px;
+}
+
+/* Signal attribution on cards */
+.signal-attribution {
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--ink-muted);
+  letter-spacing: 0.3px;
+}
+
 /* ── Responsive ───────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   #panel-container {
