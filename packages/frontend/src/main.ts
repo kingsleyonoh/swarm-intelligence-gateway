@@ -22,7 +22,7 @@ import { swarmVariant } from './config/variants/swarm.js';
 import { SwarmTheaterPanel } from './components/SwarmTheaterPanel.js';
 import { FactionMapPanel } from './components/FactionMapPanel.js';
 import { PredictionTimelinePanel } from './components/PredictionTimelinePanel.js';
-import { ConsensusHeatmapPanel } from './components/ConsensusHeatmapPanel.js';
+// ConsensusHeatmapPanel removed — didn't communicate value
 import { SwarmPredictionsLayer } from './layers/SwarmPredictionsLayer.js';
 import { FactionBoundariesLayer } from './layers/FactionBoundariesLayer.js';
 import { ConsensusHeatLayer } from './layers/ConsensusHeatLayer.js';
@@ -40,7 +40,7 @@ const variantLoader = new VariantLoader(panelRegistry, layerRegistry);
 panelRegistry.register('swarm-theater', SwarmTheaterPanel);
 panelRegistry.register('faction-map', FactionMapPanel);
 panelRegistry.register('prediction-timeline', PredictionTimelinePanel);
-panelRegistry.register('consensus-heatmap', ConsensusHeatmapPanel);
+// panelRegistry.register('consensus-heatmap', ConsensusHeatmapPanel);
 
 layerRegistry.register(
   'swarm-predictions',
@@ -63,7 +63,6 @@ const PANEL_DESCRIPTIONS: Record<string, string> = {
   'swarm-theater': 'Swarm intelligence predictions by theater. Each card shows what 4,096 AI agents predict will happen next. Click for the full intelligence brief.',
   'faction-map': 'How factions relate to each other. Node size = influence, color = stance (red = escalation, blue = de-escalation, yellow = uncertain).',
   'prediction-timeline': 'Prediction confidence over time. Each dot is a prediction colored by type. Lines connect predictions for the same theater.',
-  'consensus-heatmap': 'Controls for the globe heatmap overlay. Adjust intensity threshold to filter predictions by confidence level.',
 };
 
 // Phase 5: Mount panels into the panel container

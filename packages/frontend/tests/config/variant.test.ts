@@ -11,16 +11,15 @@ describe('swarm variant config', () => {
     expect(config.name).toBe('Swarm Intelligence');
   });
 
-  it('defines all four swarm panels in order', () => {
+  it('defines all three swarm panels in order', () => {
     const { panels } = swarmVariant;
-    expect(panels).toHaveLength(4);
+    expect(panels).toHaveLength(3);
 
     const ids = panels.map((p) => p.id);
     expect(ids).toEqual([
       'swarm-theater',
       'faction-map',
       'prediction-timeline',
-      'consensus-heatmap',
     ]);
   });
 
@@ -41,7 +40,7 @@ describe('swarm variant config', () => {
     const nonHero = swarmVariant.panels.filter(
       (p) => p.id !== 'swarm-theater'
     );
-    expect(nonHero.length).toBe(3);
+    expect(nonHero.length).toBe(2);
     for (const panel of nonHero) {
       expect(panel.expanded).toBe(false);
     }
@@ -81,7 +80,6 @@ describe('swarm variant config', () => {
     expect(refreshIntervals.simulations).toBe(30_000);
     expect(refreshIntervals.predictions).toBe(60_000);
     expect(refreshIntervals.factions).toBe(60_000);
-    expect(refreshIntervals.heatmap).toBe(120_000);
   });
 
   it('sets api base url to empty string (relative)', () => {

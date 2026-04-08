@@ -93,11 +93,10 @@ describe('VariantLoader', () => {
 
   it('loads a variant config and returns resolved panels', () => {
     const result = loader.load(swarmVariant);
-    expect(result.panels).toHaveLength(4);
+    expect(result.panels).toHaveLength(3);
     expect(result.panels[0].id).toBe('swarm-theater');
     expect(result.panels[1].id).toBe('faction-map');
     expect(result.panels[2].id).toBe('prediction-timeline');
-    expect(result.panels[3].id).toBe('consensus-heatmap');
   });
 
   it('loads a variant config and returns resolved layers', () => {
@@ -117,7 +116,6 @@ describe('VariantLoader', () => {
       'swarm-theater',
       'faction-map',
       'prediction-timeline',
-      'consensus-heatmap',
     ]);
   });
 
@@ -140,7 +138,7 @@ describe('VariantLoader', () => {
   it('skips panels not registered in registry', () => {
     panelRegistry.unregister('faction-map');
     const result = loader.load(swarmVariant);
-    expect(result.panels).toHaveLength(3);
+    expect(result.panels).toHaveLength(2);
     const ids = result.panels.map((p) => p.id);
     expect(ids).not.toContain('faction-map');
   });

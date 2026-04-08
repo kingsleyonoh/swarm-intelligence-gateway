@@ -10,7 +10,7 @@ import type { VariantConfig } from '../../types.js';
  *  1. SwarmTheaterPanel (hero) — theater cards, confidence gauges, faction bars
  *  2. FactionMapPanel — D3 force-directed faction graph
  *  3. PredictionTimelinePanel — D3 SVG confidence timeline
- *  4. ConsensusHeatmapPanel — deck.gl heatmap controls
+ *  (ConsensusHeatmapPanel removed — didn't communicate value)
  *
  * Layers:
  *  1. factionBoundaries — GeoJsonLayer (rendered first, below)
@@ -35,11 +35,6 @@ export const swarmVariant: VariantConfig = {
     {
       id: 'prediction-timeline',
       order: 30,
-      expanded: false,
-    },
-    {
-      id: 'consensus-heatmap',
-      order: 40,
       expanded: false,
     },
   ],

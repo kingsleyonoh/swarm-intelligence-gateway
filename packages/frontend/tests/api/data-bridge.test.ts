@@ -82,7 +82,6 @@ describe('DataBridge', () => {
   let bridge: DataBridge;
   let theaterPanel: Panel;
   let timelinePanel: Panel;
-  let heatmapPanel: Panel;
   let factionPanel: Panel;
 
   beforeEach(() => {
@@ -99,7 +98,6 @@ describe('DataBridge', () => {
 
     theaterPanel = makeMockPanel('swarm-theater');
     timelinePanel = makeMockPanel('prediction-timeline');
-    heatmapPanel = makeMockPanel('consensus-heatmap');
     factionPanel = makeMockPanel('faction-map');
 
     bridge = new DataBridge({
@@ -109,7 +107,6 @@ describe('DataBridge', () => {
       panels: new Map([
         ['swarm-theater', theaterPanel],
         ['prediction-timeline', timelinePanel],
-        ['consensus-heatmap', heatmapPanel],
         ['faction-map', factionPanel],
       ]),
     });
@@ -185,23 +182,6 @@ describe('DataBridge', () => {
       });
     });
 
-    it('routes heatmap data to consensus-heatmap panel', async () => {
-      const heatData = { data: [{ id: 'pred-1' }] };
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: () => Promise.resolve(heatData),
-        }),
-      );
-
-      bridge.startAll();
-      await vi.waitFor(() => {
-        expect(heatmapPanel.update).toHaveBeenCalled();
-      });
-    });
   });
 
   describe('error handling', () => {

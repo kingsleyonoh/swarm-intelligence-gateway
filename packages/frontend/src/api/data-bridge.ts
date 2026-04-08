@@ -11,7 +11,6 @@ import {
   transformSimulations,
   transformPredictions,
   transformFactions,
-  transformHeatmap,
   getCachedPredictions,
 } from './data-bridge-transforms.js';
 export interface DataBridgeConfig {
@@ -97,17 +96,6 @@ export class DataBridge {
         headers,
         panels.get('swarm-theater'),
         transformSimulations,
-      ),
-    );
-
-    // Latest predictions → ConsensusHeatmapPanel
-    loops.push(
-      this.createTransformedLoop(
-        `${base}/api/predictions/latest?minConfidence=0.5&limit=20`,
-        refreshIntervals.heatmap,
-        headers,
-        panels.get('consensus-heatmap'),
-        transformHeatmap,
       ),
     );
 
