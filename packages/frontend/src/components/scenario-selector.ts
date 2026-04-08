@@ -15,6 +15,8 @@ export interface ScenarioOption {
 export interface ScenarioSelectorController {
   setOptions(options: ScenarioOption[]): void;
   setLoading(loading: boolean): void;
+  /** Block launches while a simulation is already active */
+  setSimulationActive(active: boolean): void;
   destroy(): void;
 }
 
@@ -54,15 +56,25 @@ export function createScenarioSelector(
   // ── Event wiring ──────────────────────────────────────────────────
 
   let isLoading = false;
+  let simActive = false;
 
-  select.addEventListener('change', () => {
-    if (!isLoading) {
+  function updateButton(): void {
+    if (isLoading) return;
+    if (simActive) {
+      btn.textContent = 'Simulation in progress...';
+      btn.disabled = true;
+      btn.classList.add('analyze-btn--running');
+    } else {
+      btn.textContent = 'Run Swarm Analysis';
       btn.disabled = select.value === '';
+      btn.classList.remove('analyze-btn--running');
     }
-  });
+  }
+
+  select.addEventListener('change', () => updateButton());
 
   btn.addEventListener('click', () => {
-    if (btn.disabled || select.value === '') return;
+    if (btn.disabled || select.value === '' || simActive) return;
     onLaunch(select.value);
   });
 
@@ -91,16 +103,19 @@ export function createScenarioSelector(
 
     setLoading(loading: boolean): void {
       isLoading = loading;
-
       if (loading) {
         btn.textContent = 'Launching...';
         btn.disabled = true;
         select.disabled = true;
       } else {
-        btn.textContent = 'Run Swarm Analysis';
-        btn.disabled = select.value === '';
         select.disabled = false;
+        updateButton();
       }
+    },
+
+    setSimulationActive(active: boolean): void {
+      simActive = active;
+      updateButton();
     },
 
     destroy(): void {

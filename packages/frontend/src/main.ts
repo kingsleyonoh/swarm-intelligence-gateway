@@ -87,6 +87,7 @@ if (panelContainer) {
   let lastActiveSimId = '';
   document.addEventListener('simulation-active', ((e: Event) => {
     const detail = (e as CustomEvent<{ id: string; status: string; theater: string }>).detail;
+    scenarioSelector.setSimulationActive(true);
     if (detail && swarmHero) {
       const base = swarmVariant.apiBaseUrl || window.location.origin;
       const key = (import.meta as unknown as Record<string, Record<string, string>>).env?.VITE_API_KEY ?? '';
@@ -122,6 +123,7 @@ if (panelContainer) {
 
   document.addEventListener('simulation-idle', () => {
     swarmHero?.setDemo();
+    scenarioSelector.setSimulationActive(false);
   });
 }
 const intelTicker = createIntelTicker(tickerContainer);
