@@ -107,7 +107,7 @@ export function createActiveSimCard(
 
   // Swarm canvas (fills wrapper)
   const canvasCtrl = createSwarmCanvas(wrapper, {
-    particleCount: 150,
+    particleCount: 200,
     width: 600,
     height: 300,
     phase: (data.status as 'idle') ?? 'idle',

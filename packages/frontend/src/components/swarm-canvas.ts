@@ -33,11 +33,12 @@ interface Particle {
 }
 
 const STANCE_COLORS = ['#e05252', '#4a90d9', '#d4a843', '#9b59b6'];
-const GRAY = '#666666';
+const GRAY = '#555555';
 const BG_COLOR = '#1A1D26';
-const CONNECTION_DIST = 60;
-const CONNECTION_ALPHA = 0.08;
-const PARTICLE_RADIUS = 3;
+const CONNECTION_DIST = 80;
+const CONNECTION_ALPHA = 0.12;
+const PARTICLE_RADIUS = 4;
+const TRAIL_ALPHA = 0.15; // afterglow trail opacity
 
 /** Assign a stance group based on distribution: 40% red, 30% blue, 20% yellow, 10% purple */
 function assignGroup(index: number, total: number): number {
@@ -64,13 +65,16 @@ function initParticles(count: number, w: number, h: number): Particle[] {
 }
 
 function updateGraphBuilding(p: Particle, w: number, h: number): void {
-  p.vx += (Math.random() - 0.5) * 0.1;
-  p.vy += (Math.random() - 0.5) * 0.1;
-  p.vx *= 0.98;
-  p.vy *= 0.98;
+  // Gentle drift with occasional bursts — like neurons waking up
+  p.vx += (Math.random() - 0.5) * 0.15;
+  p.vy += (Math.random() - 0.5) * 0.15;
+  p.vx *= 0.97;
+  p.vy *= 0.97;
+  // Slowly start tinting toward final color
+  p.color = GRAY;
   p.x += p.vx;
   p.y += p.vy;
-  wrapBounds(p, w, h);
+  softBounds(p, w, h);
 }
 
 function updateSimulating(
@@ -83,38 +87,60 @@ function updateSimulating(
   p.color = STANCE_COLORS[p.group];
   let fx = 0;
   let fy = 0;
-  for (let j = 0; j < all.length; j++) {
+
+  // Only sample ~30 particles for performance + organic feel
+  const step = Math.max(1, Math.floor(all.length / 30));
+  for (let j = 0; j < all.length; j += step) {
     if (j === idx) continue;
     const other = all[j];
     const dx = other.x - p.x;
     const dy = other.y - p.y;
-    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-    if (dist > 120) continue;
-    const force = p.group === other.group ? 0.002 : -0.001;
-    fx += (dx / dist) * force;
-    fy += (dy / dist) * force;
+    const distSq = dx * dx + dy * dy;
+    if (distSq > 40000) continue; // 200px radius
+    const dist = Math.sqrt(distSq) || 1;
+
+    if (p.group === other.group) {
+      // Strong attraction to same stance — this creates visible clusters
+      fx += (dx / dist) * 0.015;
+      fy += (dy / dist) * 0.015;
+    } else {
+      // Moderate repulsion from different stance
+      fx -= (dx / dist) * 0.004;
+      fy -= (dy / dist) * 0.004;
+    }
   }
-  p.vx += fx + (Math.random() - 0.5) * 0.3;
-  p.vy += fy + (Math.random() - 0.5) * 0.3;
-  p.vx *= 0.97;
-  p.vy *= 0.97;
+
+  // Add organic noise but less than the clustering force
+  p.vx += fx + (Math.random() - 0.5) * 0.2;
+  p.vy += fy + (Math.random() - 0.5) * 0.2;
+  // Speed limit for smooth movement
+  const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+  if (speed > 2.5) { p.vx *= 2.5 / speed; p.vy *= 2.5 / speed; }
+  p.vx *= 0.96;
+  p.vy *= 0.96;
   p.x += p.vx;
   p.y += p.vy;
-  wrapBounds(p, w, h);
+  softBounds(p, w, h);
 }
 
-function updateReporting(p: Particle): void {
-  p.vx *= 0.95;
-  p.vy *= 0.95;
+function updateReporting(p: Particle, w: number, h: number): void {
+  // Slow down but NEVER freeze — gentle drift within clusters
+  p.vx += (Math.random() - 0.5) * 0.08;
+  p.vy += (Math.random() - 0.5) * 0.08;
+  p.vx *= 0.93;
+  p.vy *= 0.93;
   p.x += p.vx;
   p.y += p.vy;
+  softBounds(p, w, h);
 }
 
-function wrapBounds(p: Particle, w: number, h: number): void {
-  if (p.x < 0) p.x = w;
-  if (p.x > w) p.x = 0;
-  if (p.y < 0) p.y = h;
-  if (p.y > h) p.y = 0;
+/** Soft boundary — particles bounce off edges with dampening */
+function softBounds(p: Particle, w: number, h: number): void {
+  const margin = 10;
+  if (p.x < margin) { p.x = margin; p.vx = Math.abs(p.vx) * 0.5; }
+  if (p.x > w - margin) { p.x = w - margin; p.vx = -Math.abs(p.vx) * 0.5; }
+  if (p.y < margin) { p.y = margin; p.vy = Math.abs(p.vy) * 0.5; }
+  if (p.y > h - margin) { p.y = h - margin; p.vy = -Math.abs(p.vy) * 0.5; }
 }
 
 function drawParticles(
@@ -122,31 +148,38 @@ function drawParticles(
   particles: Particle[],
   phase: string,
 ): void {
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  // Trail effect — semi-transparent background fill instead of clear
   ctx.fillStyle = BG_COLOR;
+  ctx.globalAlpha = phase === 'simulating' ? TRAIL_ALPHA + 0.15 : 0.4;
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.globalAlpha = 1;
 
-  // Draw connections in graph_building and simulating phases
+  // Draw connections
   if (phase === 'graph_building' || phase === 'simulating') {
     drawConnections(ctx, particles);
   }
 
-  // Draw particles
+  // Cluster glow in simulating + reporting
+  if (phase === 'simulating' || phase === 'reporting' || phase === 'completed') {
+    drawClusterGlow(ctx, particles);
+  }
+
+  // Draw particles with glow
   for (const p of particles) {
+    // Outer glow
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, PARTICLE_RADIUS * 3, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = 0.08;
+    ctx.fill();
+
+    // Core particle
     ctx.beginPath();
     ctx.arc(p.x, p.y, PARTICLE_RADIUS, 0, Math.PI * 2);
     ctx.fillStyle = p.color;
+    ctx.globalAlpha = 0.9;
     ctx.fill();
-    ctx.strokeStyle = p.color;
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = 0.3;
-    ctx.stroke();
     ctx.globalAlpha = 1;
-  }
-
-  // Glow effect on largest cluster in reporting phase
-  if (phase === 'reporting') {
-    drawClusterGlow(ctx, particles);
   }
 }
 
@@ -179,7 +212,7 @@ function drawClusterGlow(
   ctx: CanvasRenderingContext2D,
   particles: Particle[],
 ): void {
-  // Find center of mass of the largest group
+  // Find center of mass of EACH group and draw glow
   const counts = [0, 0, 0, 0];
   const cx = [0, 0, 0, 0];
   const cy = [0, 0, 0, 0];
@@ -188,23 +221,26 @@ function drawClusterGlow(
     cx[p.group] += p.x;
     cy[p.group] += p.y;
   }
-  let largest = 0;
-  for (let g = 1; g < 4; g++) {
-    if (counts[g] > counts[largest]) largest = g;
-  }
-  if (counts[largest] === 0) return;
-  const centerX = cx[largest] / counts[largest];
-  const centerY = cy[largest] / counts[largest];
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, 40, 0, Math.PI * 2);
-  ctx.fillStyle = STANCE_COLORS[largest];
-  ctx.globalAlpha = 0.06;
-  ctx.shadowBlur = 30;
-  ctx.shadowColor = STANCE_COLORS[largest];
-  ctx.fill();
-  ctx.restore();
+  for (let g = 0; g < 4; g++) {
+    if (counts[g] < 3) continue;
+    const centerX = cx[g] / counts[g];
+    const centerY = cy[g] / counts[g];
+    const radius = 30 + counts[g] * 0.8;
+
+    // Radial gradient glow
+    const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+    grad.addColorStop(0, STANCE_COLORS[g]);
+    grad.addColorStop(1, 'transparent');
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = 0.12;
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 export function createSwarmCanvas(
@@ -238,10 +274,11 @@ export function createSwarmCanvas(
         updateSimulating(p, particles, i, w, h);
       } else if (phase === 'reporting') {
         p.color = STANCE_COLORS[p.group];
-        updateReporting(p);
+        updateReporting(p, w, h);
       } else if (phase === 'completed') {
-        // Freeze — no movement
+        // Gentle drift — never fully freeze
         p.color = STANCE_COLORS[p.group];
+        updateReporting(p, w, h);
       }
       // idle: no updates
     }
