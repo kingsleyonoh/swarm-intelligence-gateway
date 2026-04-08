@@ -158,10 +158,12 @@ export class SwarmTheaterPanel implements Panel {
   }
 
   private buildCard(data: TheaterCardData): HTMLElement {
-    // Active simulations get the full-width swarm particle card
+    // Skip active simulations — the swarm hero handles the live visualization
     const isActive = ACTIVE_SIM_STATUSES.has(data.status ?? '');
     if (isActive) {
-      return createActiveSimCard(data, () => this.expandCard(data.id));
+      const skip = document.createElement('div');
+      skip.style.display = 'none';
+      return skip;
     }
 
     const card = document.createElement('div');
