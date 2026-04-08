@@ -22,9 +22,9 @@ interface SimEdge { source: SimNode; target: SimNode; weight: number; }
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const VIEW_W = 600;
 const VIEW_H = 400;
-const MIN_R = 14;
-const MAX_R = 45;
-const LABEL_INSIDE_R = 25;
+const MIN_R = 12;
+const MAX_R = 36;
+const LABEL_INSIDE_R = 22;
 const WARMUP_TICKS = 60;
 
 export class FactionMapPanel implements Panel {
@@ -212,16 +212,18 @@ export class FactionMapPanel implements Panel {
       text.setAttribute('class', 'faction-label');
       text.setAttribute('x', String(node.x));
       text.setAttribute('text-anchor', 'middle');
+      // Truncate long labels
+      const label = node.name.length > 18 ? node.name.slice(0, 16) + '...' : node.name;
       if (r >= LABEL_INSIDE_R) {
         text.setAttribute('y', String(node.y + 4));
         text.setAttribute('fill', '#fff');
-        text.setAttribute('font-size', '10');
+        text.setAttribute('font-size', '9');
       } else {
-        text.setAttribute('y', String(node.y + r + 16));
-        text.setAttribute('fill', '#aaa');
-        text.setAttribute('font-size', '11');
+        text.setAttribute('y', String(node.y + r + 14));
+        text.setAttribute('fill', 'var(--ink-secondary, #5F6470)');
+        text.setAttribute('font-size', '10');
       }
-      text.textContent = node.name;
+      text.textContent = label;
       this.labelGroup.appendChild(text);
     }
   }
