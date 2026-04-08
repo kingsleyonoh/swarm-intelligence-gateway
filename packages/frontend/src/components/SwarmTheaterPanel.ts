@@ -68,7 +68,12 @@ export class SwarmTheaterPanel implements Panel {
   update(data: unknown): void {
     if (!Array.isArray(data)) return;
     this.poller.clearAll();
-    this.cards = data as TheaterCardData[];
+    // Sort newest first by predictedAt
+    this.cards = (data as TheaterCardData[]).sort((a, b) => {
+      const ta = a.predictedAt ? new Date(a.predictedAt).getTime() : 0;
+      const tb = b.predictedAt ? new Date(b.predictedAt).getTime() : 0;
+      return tb - ta;
+    });
     this.expandedCardId = null;
     this.renderCards();
   }
@@ -197,6 +202,16 @@ export class SwarmTheaterPanel implements Panel {
       horizon.className = 'prediction-horizon';
       horizon.textContent = data.timeHorizon;
       predHeader.appendChild(horizon);
+    }
+
+    // "NEW" badge for predictions less than 1 hour old
+    const ageMs = data.predictedAt ? Date.now() - new Date(data.predictedAt).getTime() : Infinity;
+    if (ageMs < 3600000) {
+      const newBadge = document.createElement('span');
+      newBadge.className = 'prediction-new-badge';
+      newBadge.textContent = 'NEW';
+      predHeader.appendChild(newBadge);
+      card.classList.add('theater-card--new');
     }
 
     card.appendChild(predHeader);

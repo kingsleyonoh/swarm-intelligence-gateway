@@ -515,6 +515,33 @@ body::after {
   margin-left: auto;
 }
 
+.prediction-new-badge {
+  font-family: var(--font-data);
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--signal-green);
+  padding: 2px 8px;
+  border-radius: 2px;
+  letter-spacing: 1.5px;
+  animation: new-pulse 2s ease-in-out infinite;
+}
+
+@keyframes new-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.theater-card--new {
+  border-color: var(--signal-green);
+  box-shadow: var(--shadow-card), 0 0 0 1px rgba(46, 125, 79, 0.15);
+}
+
+.theater-card--new::before {
+  background: linear-gradient(to bottom, var(--signal-green), var(--copper));
+  opacity: 1;
+}
+
 .theater-card h3 {
   font-family: var(--font-display);
   font-size: 20px;
