@@ -25,6 +25,11 @@ const DEFAULT_POV = { lat: 20, lng: 30, altitude: 2.5 };
 /** Auto-rotate speed */
 const AUTO_ROTATE_SPEED = 0.4;
 
+/** HTML-escape for tooltip content */
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 /** Convert hex color to comma-separated RGB string */
 function hexToRgb(hex: string): string {
   const h = hex.replace('#', '');
@@ -190,7 +195,25 @@ export class GlobeRenderer {
       .pointColor('color')
       .pointAltitude(0.015)
       .pointRadius('size')
-      .pointLabel('label');
+      .pointLabel((d: unknown) => {
+        const m = d as GlobeMarker;
+        return `<div style="
+          font-family: 'Figtree', sans-serif;
+          background: rgba(26,29,38,0.92);
+          color: #F6F1E9;
+          padding: 8px 14px;
+          border-radius: 4px;
+          font-size: 13px;
+          line-height: 1.4;
+          border-left: 3px solid ${m.color};
+          box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+          pointer-events: none;
+          max-width: 280px;
+        ">
+          <div style="font-weight:600; margin-bottom:2px;">${esc(m.label.split(':')[0] ?? '')}</div>
+          <div style="color: rgba(246,241,233,0.6); font-size:12px;">${esc(m.label.split(':').slice(1).join(':').trim())}</div>
+        </div>`;
+      });
   }
 
   /** Configure pulsing ring layer accessors */
