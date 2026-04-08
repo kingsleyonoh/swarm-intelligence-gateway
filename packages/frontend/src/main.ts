@@ -65,8 +65,17 @@ const PANEL_DESCRIPTIONS: Record<string, string> = {
   'prediction-timeline': 'Prediction confidence over time. Each dot is a prediction colored by type. Lines connect predictions for the same theater.',
 };
 
-// Phase 5: Mount panels into the panel container
+// Phase 5a: Mount swarm hero visualization (always-visible demo loop)
+import { createSwarmHero } from './components/swarm-hero.js';
 const panelContainer = document.getElementById('panel-container');
+if (panelContainer) {
+  const heroContainer = document.createElement('div');
+  heroContainer.id = 'swarm-hero-mount';
+  panelContainer.parentElement?.insertBefore(heroContainer, panelContainer);
+  createSwarmHero(heroContainer);
+}
+
+// Phase 5b: Mount panels into the panel container
 if (panelContainer) {
   for (const panel of panels) {
     const section = document.createElement('section');

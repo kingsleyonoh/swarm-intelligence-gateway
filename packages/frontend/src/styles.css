@@ -164,6 +164,58 @@ body::after {
   border: 1px solid rgba(181, 101, 43, 0.25);
 }
 
+/* ── Swarm Hero (always-visible demo loop) ───────────────────────── */
+.swarm-hero {
+  position: relative;
+  width: 100%;
+  background: var(--header-bg);
+  overflow: hidden;
+}
+
+.swarm-hero-canvas {
+  width: 100%;
+}
+
+.swarm-hero-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.swarm-hero-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.swarm-hero-phase {
+  font-family: var(--font-data);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--copper);
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+}
+
+.swarm-hero-subtitle {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: rgba(246, 241, 233, 0.35);
+  margin-top: 6px;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+}
+
+#swarm-hero-mount {
+  margin: 0 auto;
+  max-width: 1440px;
+  padding: 0 40px;
+}
+
 /* ── Globe Container ─────────────────────────────────────────────── */
 #globe-container {
   display: block;
