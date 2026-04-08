@@ -90,7 +90,7 @@ describe('SwarmTheaterPanel', () => {
       panel.mount(container);
       const grid = container.querySelector('.theater-grid') as HTMLElement;
       expect(grid.style.display).toBe('grid');
-      expect(grid.style.gridTemplateColumns).toContain('200px');
+      expect(grid.style.gridTemplateColumns).toContain('320px');
     });
   });
 

@@ -83,7 +83,7 @@ export class SwarmTheaterPanel implements Panel {
     const grid = document.createElement('div');
     grid.className = 'theater-grid';
     grid.style.display = 'grid';
-    grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(200px, 1fr))';
+    grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(320px, 1fr))';
     grid.style.gap = '16px';
     return grid;
   }
@@ -286,7 +286,7 @@ export class SwarmTheaterPanel implements Panel {
     if (this.gridEl) {
       this.gridEl.style.display = 'grid';
       this.gridEl.style.gridTemplateColumns =
-        'repeat(auto-fill, minmax(200px, 1fr))';
+        'repeat(auto-fill, minmax(320px, 1fr))';
     }
     if (this.filterBarEl) this.filterBarEl.style.display = '';
   }
