@@ -68,11 +68,17 @@ export class SwarmTheaterPanel implements Panel {
   update(data: unknown): void {
     if (!Array.isArray(data)) return;
     this.poller.clearAll();
-    // Sort newest first by predictedAt
-    this.cards = (data as TheaterCardData[]).sort((a, b) => {
+    // Sort newest first, then deduplicate by theater (newest wins)
+    const sorted = (data as TheaterCardData[]).sort((a, b) => {
       const ta = a.predictedAt ? new Date(a.predictedAt).getTime() : 0;
       const tb = b.predictedAt ? new Date(b.predictedAt).getTime() : 0;
       return tb - ta;
+    });
+    const seen = new Set<string>();
+    this.cards = sorted.filter((card) => {
+      if (seen.has(card.theater)) return false;
+      seen.add(card.theater);
+      return true;
     });
     this.expandedCardId = null;
     this.renderCards();

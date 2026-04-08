@@ -174,9 +174,9 @@ describe('SwarmTheaterPanel', () => {
     it('filters cards by domain when filter button clicked', () => {
       panel.mount(container);
       panel.update([
-        makeCard({ id: 'sim-1', domain: 'conflict' }),
-        makeCard({ id: 'sim-2', domain: 'market' }),
-        makeCard({ id: 'sim-3', domain: 'conflict' }),
+        makeCard({ id: 'sim-1', theater: 'Middle East', domain: 'conflict' }),
+        makeCard({ id: 'sim-2', theater: 'South China Sea', domain: 'market' }),
+        makeCard({ id: 'sim-3', theater: 'Eastern Europe', domain: 'conflict' }),
       ]);
 
       const conflictBtn = Array.from(
@@ -193,8 +193,8 @@ describe('SwarmTheaterPanel', () => {
     it('shows all cards when "all" filter is clicked', () => {
       panel.mount(container);
       panel.update([
-        makeCard({ id: 'sim-1', domain: 'conflict' }),
-        makeCard({ id: 'sim-2', domain: 'market' }),
+        makeCard({ id: 'sim-1', theater: 'Middle East', domain: 'conflict' }),
+        makeCard({ id: 'sim-2', theater: 'South China Sea', domain: 'market' }),
       ]);
 
       // First click conflict filter
