@@ -91,7 +91,7 @@ export class DataBridge {
     // Simulations → SwarmTheaterPanel (uses cached predictions for enrichment)
     loops.push(
       this.createTransformedLoop(
-        `${base}/api/simulations?status=completed&limit=5`,
+        `${base}/api/simulations?limit=8`,
         refreshIntervals.simulations,
         headers,
         panels.get('swarm-theater'),

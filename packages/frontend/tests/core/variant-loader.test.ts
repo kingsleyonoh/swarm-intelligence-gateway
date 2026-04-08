@@ -163,7 +163,7 @@ describe('VariantLoader', () => {
     loader.load(swarmVariant);
     const intervals = loader.getRefreshIntervals();
     expect(intervals).toBeDefined();
-    expect(intervals!.simulations).toBe(30_000);
+    expect(intervals!.simulations).toBe(10_000);
     expect(intervals!.predictions).toBe(60_000);
   });
 

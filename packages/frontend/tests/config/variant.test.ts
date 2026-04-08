@@ -77,7 +77,7 @@ describe('swarm variant config', () => {
 
   it('sets reasonable refresh intervals', () => {
     const { refreshIntervals } = swarmVariant;
-    expect(refreshIntervals.simulations).toBe(30_000);
+    expect(refreshIntervals.simulations).toBe(10_000);
     expect(refreshIntervals.predictions).toBe(60_000);
     expect(refreshIntervals.factions).toBe(60_000);
   });

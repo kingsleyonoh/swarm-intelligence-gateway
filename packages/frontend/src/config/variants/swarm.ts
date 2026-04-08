@@ -58,7 +58,7 @@ export const swarmVariant: VariantConfig = {
   ],
 
   refreshIntervals: {
-    simulations: 30_000,
+    simulations: 10_000,
     predictions: 60_000,
     factions: 60_000,
     heatmap: 120_000,
