@@ -33,12 +33,12 @@ interface Particle {
 }
 
 const STANCE_COLORS = ['#e05252', '#4a90d9', '#d4a843', '#9b59b6'];
-const GRAY = '#555555';
+const GRAY = '#444444';
 const BG_COLOR = '#1A1D26';
-const CONNECTION_DIST = 80;
-const CONNECTION_ALPHA = 0.12;
-const PARTICLE_RADIUS = 4;
-const TRAIL_ALPHA = 0.15; // afterglow trail opacity
+const CONNECTION_DIST = 70;
+const CONNECTION_ALPHA = 0.06;
+const PARTICLE_RADIUS = 2.5;
+const TRAIL_ALPHA = 0.25; // higher = less trail (clears faster)
 
 /** Assign a stance group based on distribution: 40% red, 30% blue, 20% yellow, 10% purple */
 function assignGroup(index: number, total: number): number {
@@ -148,36 +148,36 @@ function drawParticles(
   particles: Particle[],
   phase: string,
 ): void {
-  // Trail effect — semi-transparent background fill instead of clear
+  // Trail effect — semi-transparent background fill creates motion trails
   ctx.fillStyle = BG_COLOR;
-  ctx.globalAlpha = phase === 'simulating' ? TRAIL_ALPHA + 0.15 : 0.4;
+  ctx.globalAlpha = TRAIL_ALPHA;
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.globalAlpha = 1;
 
-  // Draw connections
+  // Draw connections (thin lines between nearby particles)
   if (phase === 'graph_building' || phase === 'simulating') {
     drawConnections(ctx, particles);
   }
 
-  // Cluster glow in simulating + reporting
+  // Subtle cluster glow behind particles
   if (phase === 'simulating' || phase === 'reporting' || phase === 'completed') {
     drawClusterGlow(ctx, particles);
   }
 
-  // Draw particles with glow
+  // Draw crisp particles with subtle halo
   for (const p of particles) {
-    // Outer glow
+    // Subtle halo (small, not blobby)
     ctx.beginPath();
-    ctx.arc(p.x, p.y, PARTICLE_RADIUS * 3, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, PARTICLE_RADIUS * 2, 0, Math.PI * 2);
     ctx.fillStyle = p.color;
-    ctx.globalAlpha = 0.08;
+    ctx.globalAlpha = 0.04;
     ctx.fill();
 
-    // Core particle
+    // Crisp core dot
     ctx.beginPath();
     ctx.arc(p.x, p.y, PARTICLE_RADIUS, 0, Math.PI * 2);
     ctx.fillStyle = p.color;
-    ctx.globalAlpha = 0.9;
+    ctx.globalAlpha = 0.85;
     ctx.fill();
     ctx.globalAlpha = 1;
   }
@@ -223,12 +223,12 @@ function drawClusterGlow(
   }
 
   for (let g = 0; g < 4; g++) {
-    if (counts[g] < 3) continue;
+    if (counts[g] < 5) continue;
     const centerX = cx[g] / counts[g];
     const centerY = cy[g] / counts[g];
-    const radius = 30 + counts[g] * 0.8;
+    const radius = 20 + counts[g] * 0.5;
 
-    // Radial gradient glow
+    // Subtle radial gradient glow behind cluster
     const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
     grad.addColorStop(0, STANCE_COLORS[g]);
     grad.addColorStop(1, 'transparent');
@@ -237,7 +237,7 @@ function drawClusterGlow(
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
     ctx.fillStyle = grad;
-    ctx.globalAlpha = 0.12;
+    ctx.globalAlpha = 0.06;
     ctx.fill();
     ctx.restore();
   }

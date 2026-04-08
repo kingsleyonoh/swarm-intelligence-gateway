@@ -172,6 +172,17 @@ body::after {
   overflow: hidden;
 }
 
+/* Fade swarm hero into parchment panels below */
+.swarm-hero::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 60px;
+  background: linear-gradient(to bottom, transparent, var(--parchment));
+  pointer-events: none;
+  z-index: 1;
+}
+
 .swarm-hero-canvas {
   width: 100%;
 }
@@ -224,13 +235,13 @@ body::after {
   overflow: hidden;
 }
 
-/* Bottom fade from dark globe into parchment panels */
+/* Seamless dark transition — globe flows into ticker + swarm hero */
 #globe-container::after {
   content: '';
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  height: 80px;
-  background: linear-gradient(to bottom, transparent, var(--parchment));
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, var(--header-bg));
   pointer-events: none;
   z-index: 2;
 }
