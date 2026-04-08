@@ -122,6 +122,14 @@ if (globeContainer) {
           renderer.updateMarkers(predictionsToMarkers(detail));
         }
       }) as EventListener);
+
+      // Listen for heatmap toggle from ConsensusHeatmapPanel
+      document.addEventListener('heatmap-settings-change', ((e: Event) => {
+        const settings = (e as CustomEvent<{ enabled: boolean; intensityThreshold: number }>).detail;
+        if (settings) {
+          renderer.setHeatmapMode(settings.enabled, settings.intensityThreshold);
+        }
+      }) as EventListener);
     } catch (err) {
       console.warn('[swarm] Globe init failed (WebGL may not be available):', err);
     }

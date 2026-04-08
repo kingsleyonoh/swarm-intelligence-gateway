@@ -70,6 +70,9 @@ export class GlobeRenderer {
   private rotateTimer: ReturnType<typeof setTimeout> | null = null;
   private pointerDownHandler: (() => void) | null = null;
   private pointerUpHandler: (() => void) | null = null;
+  private currentMarkers: GlobeMarker[] = [];
+  private heatmapEnabled = false;
+  private heatmapThreshold = 0.5;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -106,16 +109,31 @@ export class GlobeRenderer {
       throw new Error('GlobeRenderer not initialized — call init() first');
     }
 
+    this.currentMarkers = markers;
     this.globe.pointsData(markers);
+    this.applyRings();
+  }
 
-    // Add pulsing rings for markers
+  /** Toggle heatmap mode — larger, slower rings when enabled */
+  setHeatmapMode(enabled: boolean, threshold: number): void {
+    this.heatmapEnabled = enabled;
+    this.heatmapThreshold = threshold;
+    this.applyRings();
+  }
+
+  private applyRings(): void {
+    if (!this.globe) return;
+    const markers = this.heatmapEnabled
+      ? this.currentMarkers.filter((m) => m.size >= this.heatmapThreshold)
+      : this.currentMarkers;
+
     const ringsData = markers.map((m) => ({
       lat: m.lat,
       lng: m.lng,
       color: m.color,
-      maxR: m.size * 3,
-      propagationSpeed: m.pulseSpeed ?? 1,
-      repeatPeriod: 1500,
+      maxR: this.heatmapEnabled ? m.size * 8 : m.size * 3,
+      propagationSpeed: this.heatmapEnabled ? 1 : 2,
+      repeatPeriod: this.heatmapEnabled ? 800 : 1500,
     }));
     this.globe.ringsData(ringsData);
   }
