@@ -11,6 +11,9 @@ function makeCard(overrides: Partial<TheaterCardData> = {}): TheaterCardData {
     currentRound: 3,
     totalRounds: 5,
     topPrediction: 'Escalation likely in next 72 hours',
+    predictionType: 'Escalation',
+    timeHorizon: '72h',
+    predictedAt: '2026-04-07T12:00:00Z',
     confidence: 0.85,
     factionSplit: [
       { stance: 'escalate', label: 'Hawks', percentage: 45 },
@@ -106,21 +109,27 @@ describe('SwarmTheaterPanel', () => {
       expect(name?.textContent).toBe('South China Sea');
     });
 
-    it('card displays agent count badge', () => {
+    it('card displays agent count in meta row', () => {
       panel.mount(container);
       panel.update([makeCard({ agentCount: 2048 })]);
       const badge = container.querySelector('.agent-count-badge');
-      expect(badge?.textContent).toContain('2048');
+      expect(badge?.textContent).toContain('2,048');
     });
 
-    it('card displays round progress bar with correct width', () => {
+    it('card displays prediction type badge', () => {
       panel.mount(container);
-      panel.update([makeCard({ currentRound: 3, totalRounds: 5 })]);
-      const bar = container.querySelector(
-        '.round-progress-fill',
-      ) as HTMLElement;
-      expect(bar).not.toBeNull();
-      expect(bar.style.width).toBe('60%');
+      panel.update([makeCard({ predictionType: 'Escalation' })]);
+      const badge = container.querySelector('.prediction-type-badge');
+      expect(badge).not.toBeNull();
+      expect(badge?.textContent).toBe('Escalation');
+    });
+
+    it('card displays confidence percentage', () => {
+      panel.mount(container);
+      panel.update([makeCard({ confidence: 0.75 })]);
+      const conf = container.querySelector('.prediction-confidence');
+      expect(conf).not.toBeNull();
+      expect(conf?.textContent).toBe('75%');
     });
 
     it('card displays top prediction text', () => {
@@ -130,13 +139,20 @@ describe('SwarmTheaterPanel', () => {
       expect(pred?.textContent).toBe('Market crash imminent');
     });
 
-    it('card renders confidence gauge SVG', () => {
+    it('card displays time horizon badge', () => {
       panel.mount(container);
-      panel.update([makeCard({ confidence: 0.75 })]);
-      const svg = container.querySelector('.confidence-gauge svg');
-      expect(svg).not.toBeNull();
-      const circle = svg?.querySelector('.gauge-arc');
-      expect(circle).not.toBeNull();
+      panel.update([makeCard({ timeHorizon: '72h' })]);
+      const horizon = container.querySelector('.prediction-horizon');
+      expect(horizon).not.toBeNull();
+      expect(horizon?.textContent).toBe('72h');
+    });
+
+    it('card displays freshness timestamp', () => {
+      panel.mount(container);
+      panel.update([makeCard({ predictedAt: new Date(Date.now() - 3600000).toISOString() })]);
+      const freshness = container.querySelector('.prediction-freshness');
+      expect(freshness).not.toBeNull();
+      expect(freshness?.textContent).toContain('h ago');
     });
 
     it('card renders faction split bar with colored segments', () => {

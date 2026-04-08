@@ -153,34 +153,80 @@ export class SwarmTheaterPanel implements Panel {
     card.dataset.domain = data.domain;
     card.dataset.cardId = data.id;
 
+    // Pulse indicator for active simulations
+    const pulse = createSimulationPulse(data.status);
+    if (pulse) {
+      card.classList.add('theater-card--simulating');
+      card.appendChild(pulse);
+    }
+
+    // Prediction type badge + confidence — the hero
+    const predHeader = document.createElement('div');
+    predHeader.className = 'prediction-header';
+
+    const typeBadge = document.createElement('span');
+    typeBadge.className = `prediction-type-badge prediction-type--${(data.predictionType || 'unknown').toLowerCase().replace(/\s+/g, '-')}`;
+    typeBadge.textContent = data.predictionType || 'Analysis';
+    predHeader.appendChild(typeBadge);
+
+    const confEl = document.createElement('span');
+    confEl.className = 'prediction-confidence';
+    confEl.textContent = `${Math.round(data.confidence * 100)}%`;
+    predHeader.appendChild(confEl);
+
+    if (data.timeHorizon) {
+      const horizon = document.createElement('span');
+      horizon.className = 'prediction-horizon';
+      horizon.textContent = data.timeHorizon;
+      predHeader.appendChild(horizon);
+    }
+
+    card.appendChild(predHeader);
+
+    // Theater name
     const name = document.createElement('h3');
     name.textContent = data.theater;
     card.appendChild(name);
 
-    const badge = document.createElement('span');
-    badge.className = 'agent-count-badge';
-    badge.textContent = String(data.agentCount);
-    card.appendChild(badge);
-
-    card.appendChild(this.buildProgressBar(data));
-
+    // Prediction summary — the core value
     const pred = document.createElement('p');
     pred.className = 'top-prediction';
     pred.textContent = data.topPrediction;
     card.appendChild(pred);
 
-    card.appendChild(createConfidenceGauge(data.confidence));
-    card.appendChild(createFactionSplitBar(data.factionSplit));
+    // Meta row: agent count + freshness
+    const meta = document.createElement('div');
+    meta.className = 'card-meta';
 
-    const pulse = createSimulationPulse(data.status);
-    if (pulse) {
-      card.classList.add('theater-card--simulating');
-      card.insertBefore(pulse, card.firstChild);
-    }
+    const badge = document.createElement('span');
+    badge.className = 'agent-count-badge';
+    badge.textContent = `${data.agentCount.toLocaleString()} agents`;
+    meta.appendChild(badge);
+
+    const freshness = document.createElement('span');
+    freshness.className = 'prediction-freshness';
+    freshness.textContent = this.formatFreshness(data.predictedAt);
+    meta.appendChild(freshness);
+
+    card.appendChild(meta);
+
+    // Faction split bar
+    card.appendChild(createFactionSplitBar(data.factionSplit));
 
     card.addEventListener('click', () => this.expandCard(data.id));
 
     return card;
+  }
+
+  private formatFreshness(dateStr: string): string {
+    if (!dateStr) return '';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
   }
 
   private buildProgressBar(data: TheaterCardData): HTMLElement {

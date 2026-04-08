@@ -60,7 +60,7 @@ const { panels, layers } = variantLoader.load(swarmVariant);
 
 // Panel descriptions for user context
 const PANEL_DESCRIPTIONS: Record<string, string> = {
-  'swarm-theater': 'Active simulation theaters. Each card shows a region being analyzed by 4,096 AI agents. Click a card for agent debate details.',
+  'swarm-theater': 'Swarm intelligence predictions by theater. Each card shows what 4,096 AI agents predict will happen next. Click for the full intelligence brief.',
   'faction-map': 'How factions relate to each other. Node size = influence, color = stance (red = escalation, blue = de-escalation, yellow = uncertain).',
   'prediction-timeline': 'Prediction confidence over time. Each dot is a prediction colored by type. Lines connect predictions for the same theater.',
   'consensus-heatmap': 'Controls for the globe heatmap overlay. Adjust intensity threshold to filter predictions by confidence level.',

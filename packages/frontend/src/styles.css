@@ -370,37 +370,94 @@ body::after {
 
 .theater-card:hover::before { opacity: 1; }
 
+/* ── Prediction Header (hero of the card) ────────────────────────── */
+.prediction-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.prediction-type-badge {
+  font-family: var(--font-data);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  padding: 4px 12px;
+  border-radius: 2px;
+  color: #fff;
+  background: var(--ink-muted);
+}
+
+.prediction-type--escalation { background: var(--signal-red); }
+.prediction-type--de-escalation { background: var(--signal-blue); }
+.prediction-type--market-shift { background: var(--signal-amber); color: #fff; }
+.prediction-type--sentiment-cascade { background: var(--signal-purple); }
+
+.prediction-confidence {
+  font-family: var(--font-data);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.5px;
+}
+
+.prediction-horizon {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--ink-muted);
+  background: var(--parchment-deep);
+  padding: 3px 10px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  margin-left: auto;
+}
+
 .theater-card h3 {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 400;
   color: var(--ink);
   line-height: 1.15;
   font-style: italic;
+  margin: -4px 0 0;
+}
+
+.top-prediction {
+  font-size: 14px;
+  color: var(--ink-secondary);
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Card Meta Row ───────────────────────────────────────────────── */
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .agent-count-badge {
   font-family: var(--font-data);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   color: var(--copper);
   background: var(--copper-light);
   padding: 3px 10px;
   border-radius: 2px;
-  display: inline-block;
-  width: fit-content;
   letter-spacing: 0.5px;
   border: 1px solid rgba(181, 101, 43, 0.12);
 }
 
-.top-prediction {
-  font-size: 15px;
-  color: var(--ink-secondary);
-  line-height: 1.65;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.prediction-freshness {
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--ink-muted);
+  letter-spacing: 0.5px;
 }
 
 /* ── Progress Bar ─────────────────────────────────────────────────── */

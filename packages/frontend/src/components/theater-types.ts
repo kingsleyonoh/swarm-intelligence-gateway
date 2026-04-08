@@ -49,6 +49,9 @@ export interface TheaterCardData {
   currentRound: number;
   totalRounds: number;
   topPrediction: string;
+  predictionType: string;
+  timeHorizon: string;
+  predictedAt: string;
   confidence: number;
   factionSplit: FactionSplitSegment[];
   agentDebate: AgentDebatePost[];
