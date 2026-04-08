@@ -243,12 +243,33 @@ export class FactionMapPanel implements Panel {
     this.tooltipEl.style.display = 'block';
     this.tooltipEl.style.left = `${event.offsetX + 12}px`;
     this.tooltipEl.style.top = `${event.offsetY - 8}px`;
-    this.tooltipEl.innerHTML = [
-      `<strong>${node.name}</strong>`,
-      `Members: ${node.memberCount}`,
-      `Stance: ${node.stance}`,
-      `Key agents: ${node.keyAgents.join(', ')}`,
-    ].join('<br>');
+
+    // Theater nodes have 'neutral' stance, prediction-type nodes have real stances
+    if (node.stance === 'neutral') {
+      // Theater node — show connected prediction types
+      const connected = this.simEdges
+        .filter((e) => e.source.id === node.id || e.target.id === node.id)
+        .map((e) => e.source.id === node.id ? e.target.name : e.source.name);
+      this.tooltipEl.innerHTML = [
+        `<strong>${node.name}</strong>`,
+        `Theater region`,
+        connected.length > 0 ? `Predictions: ${connected.join(', ')}` : '',
+      ].filter(Boolean).join('<br>');
+    } else {
+      // Prediction-type node — show stance and connected theaters
+      const stanceLabel = node.stance === 'escalate' ? 'Escalation risk'
+        : node.stance === 'de_escalate' ? 'De-escalation signal'
+        : 'Market/sentiment shift';
+      const connected = this.simEdges
+        .filter((e) => e.source.id === node.id || e.target.id === node.id)
+        .map((e) => e.source.id === node.id ? e.target.name : e.source.name)
+        .filter((n) => n !== node.name);
+      this.tooltipEl.innerHTML = [
+        `<strong>${node.name}</strong>`,
+        stanceLabel,
+        connected.length > 0 ? `Theaters: ${connected.join(', ')}` : '',
+      ].filter(Boolean).join('<br>');
+    }
   }
 
   private hideTooltip(): void {
