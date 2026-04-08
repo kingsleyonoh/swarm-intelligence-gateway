@@ -69,6 +69,11 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
   elapsed.textContent = '';
   overlay.appendChild(elapsed);
 
+  // Live stance distribution counter
+  const stanceBar = document.createElement('div');
+  stanceBar.className = 'swarm-stance-bar';
+  overlay.appendChild(stanceBar);
+
   wrapper.appendChild(overlay);
   container.appendChild(wrapper);
 
@@ -77,12 +82,30 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
   canvasWrap.style.height = `${h}px`;
 
   let canvas: SwarmCanvasController | null = createSwarmCanvas(canvasWrap, {
-    particleCount: 250, width: w, height: h, phase: 'graph_building',
+    particleCount: 350, width: w, height: h, phase: 'graph_building',
   });
 
   let isLive = false;
   let demoIdx = 0;
   let demoTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Update stance distribution counter every 500ms
+  const stanceInterval = setInterval(() => {
+    if (!canvas) return;
+    const dist = canvas.getDistribution();
+    const phase = canvas ? 'active' : 'idle';
+    // Only show during simulating or reporting phases (when particles have colors)
+    if (phase === 'active' && (demoIdx >= 1 || isLive)) {
+      stanceBar.innerHTML = [
+        `<span class="stance-item stance-esc">ESCALATION ${dist.escalation}%</span>`,
+        `<span class="stance-item stance-deesc">DE-ESCALATION ${dist.deEscalation}%</span>`,
+        `<span class="stance-item stance-market">MARKET SHIFT ${dist.marketShift}%</span>`,
+        `<span class="stance-item stance-sent">SENTIMENT ${dist.sentiment}%</span>`,
+      ].join('');
+    } else {
+      stanceBar.innerHTML = '';
+    }
+  }, 500);
 
   function clearDemoTimer(): void {
     if (demoTimer) { clearTimeout(demoTimer); demoTimer = null; }
@@ -100,7 +123,7 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
     if (demoIdx === 0) {
       canvas.destroy();
       canvas = createSwarmCanvas(canvasWrap, {
-        particleCount: 250, width: w, height: h, phase: 'graph_building',
+        particleCount: 350, width: w, height: h, phase: 'graph_building',
       });
     }
     demoTimer = setTimeout(advanceDemo, durationMs);
@@ -138,7 +161,7 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
         if (canvas) {
           canvas.destroy();
           canvas = createSwarmCanvas(canvasWrap, {
-            particleCount: 250, width: w, height: h, phase: 'graph_building',
+            particleCount: 350, width: w, height: h, phase: 'graph_building',
           });
         }
         advanceDemo();
@@ -147,6 +170,7 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
 
     destroy(): void {
       clearDemoTimer();
+      clearInterval(stanceInterval);
       if (canvas) { canvas.destroy(); canvas = null; }
       if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
     },

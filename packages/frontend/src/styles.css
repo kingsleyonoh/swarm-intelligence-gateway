@@ -260,6 +260,30 @@ body::after {
   border: 1px solid rgba(194, 59, 34, 0.3);
 }
 
+/* ── Stance Distribution Counter ─────────────────────────────────── */
+.swarm-stance-bar {
+  display: flex;
+  gap: 20px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.stance-item {
+  font-family: var(--font-data);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  padding: 3px 10px;
+  border-radius: 2px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+
+.stance-esc { color: #e05252; }
+.stance-deesc { color: #4a90d9; }
+.stance-market { color: #d4a843; }
+.stance-sent { color: #9b59b6; }
+
 #swarm-hero-mount {
   width: 100%;
 }

@@ -17,9 +17,17 @@ export interface PredictionHint {
   confidence: number;
 }
 
+export interface StanceDistribution {
+  escalation: number;
+  deEscalation: number;
+  marketShift: number;
+  sentiment: number;
+}
+
 export interface SwarmCanvasController {
   setPhase(phase: string): void;
   setPredictions(predictions: PredictionHint[]): void;
+  getDistribution(): StanceDistribution;
   destroy(): void;
 }
 
@@ -37,7 +45,7 @@ const GRAY = '#444444';
 const BG_COLOR = '#1A1D26';
 const CONNECTION_DIST = 70;
 const CONNECTION_ALPHA = 0.06;
-const PARTICLE_RADIUS = 2.5;
+const PARTICLE_RADIUS = 3;
 const TRAIL_ALPHA = 0.25; // higher = less trail (clears faster)
 
 /** Assign a stance group based on distribution: 40% red, 30% blue, 20% yellow, 10% purple */
@@ -336,6 +344,17 @@ export function createSwarmCanvas(
       if (phase === 'completed' && predictions.length > 0) {
         redistributeForPredictions(predictions);
       }
+    },
+    getDistribution(): StanceDistribution {
+      const counts = [0, 0, 0, 0];
+      for (const p of particles) counts[p.group]++;
+      const total = particles.length || 1;
+      return {
+        escalation: Math.round((counts[0] / total) * 100),
+        deEscalation: Math.round((counts[1] / total) * 100),
+        marketShift: Math.round((counts[2] / total) * 100),
+        sentiment: Math.round((counts[3] / total) * 100),
+      };
     },
     setPredictions(preds: PredictionHint[]): void {
       predictions = preds;
