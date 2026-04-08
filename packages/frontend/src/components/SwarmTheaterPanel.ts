@@ -10,14 +10,17 @@ import type { Panel } from '../types.js';
 import type { TheaterCardData, TheaterDomain } from './theater-types.js';
 import { THEATER_DOMAINS } from './theater-types.js';
 import {
-  createConfidenceGauge,
   createFactionSplitBar,
   createSimulationPulse,
-  createLiveProgress,
 } from './theater-helpers.js';
 import { createReportView } from './report-view.js';
 import { createLiveFeed } from './live-feed.js';
+import { createActiveSimCard } from './sim-card-active.js';
 import { ProgressPoller } from './progress-poller.js';
+
+const ACTIVE_SIM_STATUSES = new Set([
+  'pending', 'queued', 'graph_building', 'simulating', 'reporting',
+]);
 
 export interface TheaterPanelConfig {
   apiKey: string;
@@ -155,24 +158,22 @@ export class SwarmTheaterPanel implements Panel {
   }
 
   private buildCard(data: TheaterCardData): HTMLElement {
+    // Active simulations get the full-width swarm particle card
+    const isActive = ACTIVE_SIM_STATUSES.has(data.status ?? '');
+    if (isActive) {
+      return createActiveSimCard(data, () => this.expandCard(data.id));
+    }
+
     const card = document.createElement('div');
     card.className = 'theater-card';
     card.dataset.domain = data.domain;
     card.dataset.cardId = data.id;
 
-    // Live progress indicator for active simulations
-    const liveEl = createLiveProgress(data.status ?? '');
-    if (liveEl) {
+    // Fallback pulse for any non-active status with progress
+    const pulse = createSimulationPulse(data.status);
+    if (pulse) {
       card.classList.add('theater-card--simulating');
-      card.appendChild(liveEl);
-      this.poller.start(data.id, card);
-    } else {
-      // Fallback to simple pulse for any status not handled by live progress
-      const pulse = createSimulationPulse(data.status);
-      if (pulse) {
-        card.classList.add('theater-card--simulating');
-        card.appendChild(pulse);
-      }
+      card.appendChild(pulse);
     }
 
     // Prediction type badge + confidence — the hero
