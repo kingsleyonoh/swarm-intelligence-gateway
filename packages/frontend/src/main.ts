@@ -74,13 +74,34 @@ const panelContainer = document.getElementById('panel-container');
 // Mount intelligence ticker between globe and hero
 const tickerContainer = document.createElement('div');
 tickerContainer.id = 'intel-ticker-mount';
+let swarmHero: ReturnType<typeof createSwarmHero> | null = null;
 if (panelContainer) {
   const heroContainer = document.createElement('div');
   heroContainer.id = 'swarm-hero-mount';
   panelContainer.parentElement?.insertBefore(heroContainer, panelContainer);
-  // Insert ticker just before the hero
   panelContainer.parentElement?.insertBefore(tickerContainer, heroContainer);
-  createSwarmHero(heroContainer);
+  swarmHero = createSwarmHero(heroContainer);
+
+  // Wire swarm hero to real simulation status
+  document.addEventListener('simulation-active', ((e: Event) => {
+    const detail = (e as CustomEvent<{ id: string; status: string }>).detail;
+    if (detail && swarmHero) {
+      // Fetch real progress for elapsed time
+      const base = swarmVariant.apiBaseUrl || window.location.origin;
+      const key = (import.meta as unknown as Record<string, Record<string, string>>).env?.VITE_API_KEY ?? '';
+      fetch(`${base}/api/simulations/${detail.id}/progress`, {
+        headers: { 'X-API-Key': key },
+      }).then((r) => r.json()).then((prog: { elapsedMs?: number; status?: string }) => {
+        swarmHero?.setLive(prog.status ?? detail.status, prog.elapsedMs ?? 0);
+      }).catch(() => {
+        swarmHero?.setLive(detail.status, 0);
+      });
+    }
+  }) as EventListener);
+
+  document.addEventListener('simulation-idle', () => {
+    swarmHero?.setDemo();
+  });
 }
 const intelTicker = createIntelTicker(tickerContainer);
 

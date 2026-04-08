@@ -1,14 +1,17 @@
 /**
- * SwarmHero — persistent swarm visualization that replays the simulation
- * cycle when no active simulation is running. Always-visible hero element
- * between the globe and theater cards.
+ * SwarmHero — persistent swarm visualization between globe and theater cards.
  *
- * Loops: graph_building (8s) → simulating (15s) → reporting (5s) → hold (5s) → restart
+ * Two modes:
+ *  1. LIVE: When a real simulation is running, shows real phase + elapsed time
+ *  2. DEMO: When idle, loops through phases as a showcase
+ *
+ * Listens for 'simulation-active' CustomEvent from DataBridge to switch modes.
  */
 
 import { createSwarmCanvas, type SwarmCanvasController } from './swarm-canvas.js';
+import { formatElapsed } from './theater-helpers.js';
 
-const PHASE_TIMING: { phase: string; durationMs: number }[] = [
+const DEMO_TIMING: { phase: string; durationMs: number }[] = [
   { phase: 'graph_building', durationMs: 8000 },
   { phase: 'simulating', durationMs: 15000 },
   { phase: 'reporting', durationMs: 5000 },
@@ -16,17 +19,19 @@ const PHASE_TIMING: { phase: string; durationMs: number }[] = [
 ];
 
 const PHASE_LABELS: Record<string, string> = {
+  pending: 'QUEUED FOR ANALYSIS',
+  queued: 'QUEUED FOR ANALYSIS',
   graph_building: 'BUILDING KNOWLEDGE GRAPH',
   simulating: 'SWARM CONSENSUS FORMING',
-  reporting: 'ANALYZING PREDICTIONS',
+  reporting: 'EXTRACTING PREDICTIONS',
   completed: 'PREDICTIONS EXTRACTED',
 };
 
 export interface SwarmHeroController {
-  /** Pause the demo loop (when a real sim is active) */
-  pause(): void;
-  /** Resume the demo loop */
-  resume(): void;
+  /** Switch to live mode with real simulation data */
+  setLive(phase: string, elapsedMs: number): void;
+  /** Switch back to demo loop */
+  setDemo(): void;
   destroy(): void;
 }
 
@@ -52,63 +57,84 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
   subtitle.textContent = '4,096 AI agents reaching consensus';
   overlay.appendChild(subtitle);
 
+  const elapsed = document.createElement('div');
+  elapsed.className = 'swarm-hero-elapsed';
+  elapsed.textContent = '';
+  overlay.appendChild(elapsed);
+
   wrapper.appendChild(overlay);
   container.appendChild(wrapper);
 
-  // Initialize canvas sized to wrapper — tall and full-width for visual impact
   const w = wrapper.clientWidth || 1400;
   const h = 340;
   canvasWrap.style.height = `${h}px`;
 
   let canvas: SwarmCanvasController | null = createSwarmCanvas(canvasWrap, {
-    particleCount: 250,
-    width: w,
-    height: h,
-    phase: 'graph_building',
+    particleCount: 250, width: w, height: h, phase: 'graph_building',
   });
 
-  let phaseIdx = 0;
-  let paused = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  let isLive = false;
+  let demoIdx = 0;
+  let demoTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function advancePhase(): void {
-    if (paused || !canvas) return;
-    phaseIdx = (phaseIdx + 1) % PHASE_TIMING.length;
-    const { phase, durationMs } = PHASE_TIMING[phaseIdx];
-    canvas.setPhase(phase);
-    phaseLabel.textContent = PHASE_LABELS[phase] ?? phase;
-
-    // On restart, recreate canvas for fresh particle positions
-    if (phaseIdx === 0) {
-      canvas.destroy();
-      canvas = createSwarmCanvas(canvasWrap, {
-        particleCount: 250,
-        width: w,
-        height: h,
-        phase: 'graph_building',
-      });
-    }
-
-    timer = setTimeout(advancePhase, durationMs);
+  function clearDemoTimer(): void {
+    if (demoTimer) { clearTimeout(demoTimer); demoTimer = null; }
   }
 
-  // Start first phase
-  timer = setTimeout(advancePhase, PHASE_TIMING[0].durationMs);
+  function advanceDemo(): void {
+    if (isLive || !canvas) return;
+    demoIdx = (demoIdx + 1) % DEMO_TIMING.length;
+    const { phase, durationMs } = DEMO_TIMING[demoIdx];
+    canvas.setPhase(phase);
+    phaseLabel.textContent = PHASE_LABELS[phase] ?? phase;
+    elapsed.textContent = '';
+    subtitle.textContent = '4,096 AI agents reaching consensus';
+
+    if (demoIdx === 0) {
+      canvas.destroy();
+      canvas = createSwarmCanvas(canvasWrap, {
+        particleCount: 250, width: w, height: h, phase: 'graph_building',
+      });
+    }
+    demoTimer = setTimeout(advanceDemo, durationMs);
+  }
+
+  // Start demo loop
+  demoTimer = setTimeout(advanceDemo, DEMO_TIMING[0].durationMs);
 
   return {
-    pause(): void {
-      paused = true;
-      if (timer) { clearTimeout(timer); timer = null; }
-      wrapper.style.display = 'none';
+    setLive(phase: string, elapsedMs: number): void {
+      if (!isLive) {
+        isLive = true;
+        clearDemoTimer();
+        wrapper.classList.add('swarm-hero--live');
+      }
+      if (canvas) canvas.setPhase(phase);
+      phaseLabel.textContent = PHASE_LABELS[phase] ?? phase;
+      elapsed.textContent = formatElapsed(elapsedMs);
+      subtitle.textContent = 'LIVE — 4,096 AI agents deliberating';
     },
-    resume(): void {
-      paused = false;
-      wrapper.style.display = '';
-      advancePhase();
+
+    setDemo(): void {
+      if (isLive) {
+        isLive = false;
+        wrapper.classList.remove('swarm-hero--live');
+        elapsed.textContent = '';
+        subtitle.textContent = '4,096 AI agents reaching consensus';
+        // Restart demo from beginning
+        demoIdx = -1;
+        if (canvas) {
+          canvas.destroy();
+          canvas = createSwarmCanvas(canvasWrap, {
+            particleCount: 250, width: w, height: h, phase: 'graph_building',
+          });
+        }
+        advanceDemo();
+      }
     },
+
     destroy(): void {
-      paused = true;
-      if (timer) { clearTimeout(timer); timer = null; }
+      clearDemoTimer();
       if (canvas) { canvas.destroy(); canvas = null; }
       if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
     },

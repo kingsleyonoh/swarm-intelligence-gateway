@@ -92,15 +92,31 @@ export class DataBridge {
       ),
     );
 
-    // Simulations → SwarmTheaterPanel (uses cached predictions for enrichment)
+    // Simulations → SwarmTheaterPanel + detect active sims for swarm hero
+    const theaterPanel = panels.get('swarm-theater');
+    const ACTIVE = new Set(['pending', 'queued', 'graph_building', 'simulating', 'reporting']);
     loops.push(
-      this.createTransformedLoop(
-        `${base}/api/simulations?limit=8`,
-        refreshIntervals.simulations,
-        headers,
-        panels.get('swarm-theater'),
-        transformSimulations,
-      ),
+      new SmartPollLoop({
+        url: `${base}/api/simulations?limit=8`,
+        intervalMs: refreshIntervals.simulations,
+        fetchOptions: { headers },
+        onData: (raw: unknown) => {
+          const cards = transformSimulations(raw);
+          if (theaterPanel) theaterPanel.update(cards);
+          // Check for active simulation → notify swarm hero
+          const activeSim = cards.find((c) => ACTIVE.has(c.status ?? ''));
+          if (activeSim) {
+            document.dispatchEvent(new CustomEvent('simulation-active', {
+              detail: { id: activeSim.id, status: activeSim.status },
+            }));
+          } else {
+            document.dispatchEvent(new CustomEvent('simulation-idle'));
+          }
+        },
+        onError: (err: Error) => {
+          console.warn(`[DataBridge] Simulations poll error: ${err.message}`);
+        },
+      }),
     );
 
     // Intelligence → Ticker + globe news markers (public, no auth)
