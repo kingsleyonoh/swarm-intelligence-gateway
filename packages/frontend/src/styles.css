@@ -1652,4 +1652,75 @@ body::after {
   .panel-description { padding: 4px 20px 0; }
   .report-hero { margin: 0 -20px; padding: 24px 24px 20px; }
   .report-predictions-grid { grid-template-columns: 1fr; }
+  .scenario-selector { flex-direction: column; gap: 8px; }
+}
+
+/* ── Scenario Selector ───────────────────────────────────────────── */
+
+.scenario-selector {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 14px 20px;
+  background: var(--parchment-deep);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.scenario-select {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 36px 10px 14px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%235F6470' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.scenario-select:focus {
+  outline: none;
+  border-color: var(--copper);
+  box-shadow: 0 0 0 2px var(--copper-light);
+}
+
+.scenario-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.analyze-btn {
+  font-family: var(--font-data);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-inverse);
+  background: var(--copper);
+  border: none;
+  padding: 11px 24px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s var(--ease);
+}
+
+.analyze-btn:hover:not(:disabled) {
+  background: var(--brass);
+}
+
+.analyze-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.analyze-btn--running {
+  background: var(--signal-green);
+  pointer-events: none;
 }

@@ -29,6 +29,7 @@ import { ConsensusHeatLayer } from './layers/ConsensusHeatLayer.js';
 import { DataBridge } from './api/data-bridge.js';
 import { loadDemoData } from './api/demo-loader.js';
 import { createIntelTicker } from './components/intelligence-ticker.js';
+import { createScenarioSelector } from './components/scenario-selector.js';
 import type { Panel, MapLayerConstructor } from './types.js';
 import type { PredictionPoint } from './components/prediction-types.js';
 import type { IntelligenceData } from './components/intelligence-types.js';
@@ -124,6 +125,65 @@ if (panelContainer) {
   });
 }
 const intelTicker = createIntelTicker(tickerContainer);
+
+// Phase 5a-2: Mount scenario selector above panels
+const selectorContainer = document.createElement('div');
+selectorContainer.id = 'scenario-selector-mount';
+if (panelContainer) {
+  panelContainer.parentElement?.insertBefore(selectorContainer, panelContainer);
+}
+const scenarioSelector = createScenarioSelector(selectorContainer, (templateId) => {
+  const base = swarmVariant.apiBaseUrl || window.location.origin;
+  const key = (import.meta as unknown as Record<string, Record<string, string>>).env?.VITE_API_KEY ?? '';
+  if (!key) {
+    console.warn('[swarm] No API key — cannot launch simulation');
+    scenarioSelector.setLoading(false);
+    return;
+  }
+  scenarioSelector.setLoading(true);
+  fetch(`${base}/api/simulations/launch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
+    body: JSON.stringify({ templateId }),
+  })
+    .then((r) => r.json())
+    .then((data: { simulationId?: string; template?: { label?: string } }) => {
+      if (data.simulationId) {
+        console.info(`[swarm] Simulation launched: ${data.simulationId}`);
+      }
+      // Keep loading state for 3s then reset so polling picks up the simulation
+      setTimeout(() => scenarioSelector.setLoading(false), 3000);
+    })
+    .catch((err) => {
+      console.error('[swarm] Launch failed:', err);
+      scenarioSelector.setLoading(false);
+    });
+});
+
+// Load scenario templates (public endpoint, no auth needed)
+const templateBaseUrl = swarmVariant.apiBaseUrl || window.location.origin;
+fetch(`${templateBaseUrl}/api/scenarios/templates`)
+  .then((r) => r.json())
+  .then((data: { templates?: Array<{ id: string; label: string; category: string }> }) => {
+    if (data.templates) {
+      scenarioSelector.setOptions(data.templates);
+    }
+  })
+  .catch(() => {
+    // Fallback: hardcoded template list if API unreachable
+    scenarioSelector.setOptions([
+      { id: 'south-china-sea', label: 'South China Sea -- Naval Standoff', category: 'military' },
+      { id: 'taiwan-strait', label: 'Taiwan Strait -- Semiconductor Crisis', category: 'market' },
+      { id: 'eastern-europe', label: 'Eastern Europe -- NATO-Russia Tensions', category: 'political' },
+      { id: 'red-sea', label: 'Red Sea -- Shipping Crisis', category: 'military' },
+      { id: 'persian-gulf', label: 'Persian Gulf -- Oil Market Shock', category: 'market' },
+      { id: 'korean-peninsula', label: 'Korean Peninsula -- Missile Crisis', category: 'military' },
+      { id: 'arctic', label: 'Arctic -- Great Power Competition', category: 'political' },
+      { id: 'sahel', label: 'Sahel -- Instability Cascade', category: 'political' },
+      { id: 'cyber-global', label: 'Global Cyber Threat Landscape', category: 'cyber' },
+      { id: 'global-economy', label: 'Global Economic Realignment', category: 'market' },
+    ]);
+  });
 
 // Phase 5b: Mount panels into the panel container
 if (panelContainer) {

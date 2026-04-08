@@ -9,6 +9,7 @@ import { simulationActionRoutes } from './routes/simulation-actions.js';
 import { scenarioRoutes } from './routes/scenarios.js';
 import { predictionRoutes } from './routes/predictions.js';
 import { intelligenceRoutes } from './routes/intelligence.js';
+import { quickLaunchRoutes } from './routes/quick-launch.js';
 
 /**
  * Build and configure the Fastify application instance.
@@ -33,6 +34,7 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
   app.register(healthRoutes);
   app.register(intelligenceRoutes);
   app.register(tenantRoutes);
+  app.register(quickLaunchRoutes);
   app.register(simulationActionRoutes);
   app.register(simulationRoutes);
   app.register(scenarioRoutes);
