@@ -978,9 +978,10 @@ body::after {
 .prediction-timeline-container svg { width: 100%; height: 100%; }
 
 .timeline-axis text {
-  fill: var(--ink-muted);
-  font-size: 11px;
+  fill: var(--ink-secondary);
+  font-size: 12px;
   font-family: var(--font-data);
+  font-weight: 500;
 }
 
 .timeline-axis line { stroke: var(--border); stroke-dasharray: 2 4; }

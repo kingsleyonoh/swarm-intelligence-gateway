@@ -64,7 +64,7 @@ describe('PredictionTimelinePanel', () => {
       panel.mount(container);
       const labels = container.querySelectorAll('text');
       const texts = Array.from(labels).map((t) => t.textContent);
-      expect(texts.some((t) => t?.includes('Time'))).toBe(true);
+      expect(texts.some((t) => t?.includes('Date'))).toBe(true);
     });
 
     it('renders Y-axis label (Confidence)', () => {
@@ -211,7 +211,7 @@ describe('PredictionTimelinePanel', () => {
       const tooltip = container.querySelector(
         '.prediction-tooltip',
       ) as HTMLElement;
-      expect(tooltip.textContent).toContain('0.92');
+      expect(tooltip.textContent).toContain('92%');
       expect(tooltip.textContent).toContain('48h');
     });
 

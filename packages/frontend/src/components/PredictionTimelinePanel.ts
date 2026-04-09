@@ -23,7 +23,7 @@ const CHART_HEIGHT = 400;
 const MARGIN = { top: 20, right: 20, bottom: 40, left: 50 };
 const PLOT_W = CHART_WIDTH - MARGIN.left - MARGIN.right;
 const PLOT_H = CHART_HEIGHT - MARGIN.top - MARGIN.bottom;
-const DOT_RADIUS = 6;
+const DOT_RADIUS = 8;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class PredictionTimelinePanel implements Panel {
@@ -137,7 +137,7 @@ export class PredictionTimelinePanel implements Panel {
       tick.setAttribute('text-anchor', 'end');
       tick.setAttribute('fill', '#666');
       tick.setAttribute('font-size', '11');
-      tick.textContent = val.toFixed(val % 0.5 === 0 ? 1 : 2);
+      tick.textContent = `${Math.round(val * 100)}%`;
       this.plotGroup.appendChild(tick);
     }
 
@@ -149,7 +149,7 @@ export class PredictionTimelinePanel implements Panel {
     yLabel.setAttribute('transform', 'rotate(-90)');
     yLabel.setAttribute('fill', '#666');
     yLabel.setAttribute('font-size', '11');
-    yLabel.textContent = 'Confidence';
+    yLabel.textContent = 'Prediction Confidence';
     this.svgEl.appendChild(yLabel);
 
     // X-axis date ticks (rendered after update when we know the time range)
@@ -161,7 +161,7 @@ export class PredictionTimelinePanel implements Panel {
     xLabel.setAttribute('text-anchor', 'middle');
     xLabel.setAttribute('fill', '#666');
     xLabel.setAttribute('font-size', '11');
-    xLabel.textContent = 'Time';
+    xLabel.textContent = 'Prediction Date';
     this.svgEl.appendChild(xLabel);
   }
 
@@ -281,9 +281,6 @@ export class PredictionTimelinePanel implements Panel {
   private renderDots(): void {
     if (!this.plotGroup) return;
 
-    // Track which theaters have been labeled (one label per theater)
-    const labeledTheaters = new Set<string>();
-
     // Build jitter offsets for dots sharing the same timestamp
     const tsCounts = new Map<string, number>();
     const tsIndex = new Map<string, number>();
@@ -316,21 +313,6 @@ export class PredictionTimelinePanel implements Panel {
       circle.addEventListener('mouseleave', () => this.hideTooltip());
 
       this.plotGroup.appendChild(circle);
-
-      // Add theater label next to dot (only for first dot per theater to avoid clutter)
-      if (!labeledTheaters.has(point.theater)) {
-        labeledTheaters.add(point.theater);
-        const label = document.createElementNS(SVG_NS, 'text');
-        label.setAttribute('class', 'prediction-dot-label');
-        label.setAttribute('x', String(cx + DOT_RADIUS + 6));
-        label.setAttribute('y', String(cy + 4));
-        label.setAttribute('fill', color);
-        label.setAttribute('font-size', '10');
-        label.setAttribute('font-family', 'var(--font-data, monospace)');
-        const shortName = point.theater.length > 16 ? point.theater.slice(0, 14) + '...' : point.theater;
-        label.textContent = `${shortName} ${Math.round(point.confidence * 100)}%`;
-        this.plotGroup.appendChild(label);
-      }
     }
   }
 
@@ -350,7 +332,7 @@ export class PredictionTimelinePanel implements Panel {
     this.tooltipEl.innerHTML = [
       `<strong>${point.theater}</strong>`,
       summary,
-      `Confidence: ${point.confidence}`,
+      `Confidence: ${Math.round(point.confidence * 100)}%`,
       `Horizon: ${point.timeHorizon}`,
     ].join('<br>');
   }
