@@ -95,9 +95,9 @@ if (panelContainer) {
       // Fetch progress for elapsed time
       fetch(`${base}/api/simulations/${detail.id}/progress`, {
         headers: { 'X-API-Key': key },
-      }).then((r) => r.json()).then((prog: { elapsedMs?: number; status?: string }) => {
+      }).then((r) => r.json()).then((prog: { elapsedMs?: number; status?: string; agentCount?: number }) => {
         const topic = detail.theater !== 'Simulation Theater' ? `ANALYZING: ${detail.theater}` : '';
-        swarmHero?.setLive(prog.status ?? detail.status, prog.elapsedMs ?? 0, topic, detail.id);
+        swarmHero?.setLive(prog.status ?? detail.status, prog.elapsedMs ?? 0, topic, detail.id, prog.agentCount);
       }).catch(() => {
         swarmHero?.setLive(detail.status, 0, undefined, detail.id);
       });

@@ -151,7 +151,7 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
   demoTimer = setTimeout(advanceDemo, DEMO_TIMING[0].durationMs);
 
   return {
-    setLive(phase: string, elapsedMs: number, topic?: string, _simId?: string): void {
+    setLive(phase: string, elapsedMs: number, topic?: string, _simId?: string, agentCount?: number): void {
       if (!isLive) {
         isLive = true;
         clearDemoTimer();
@@ -160,7 +160,8 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
       if (canvas) canvas.setPhase(phase);
       phaseLabel.textContent = PHASE_LABELS[phase] ?? phase;
       elapsed.textContent = formatElapsed(elapsedMs);
-      subtitle.textContent = 'LIVE — 4,096 AI agents deliberating';
+      const count = agentCount ? agentCount.toLocaleString() : '4,096';
+      subtitle.textContent = `LIVE — ${count} AI agents deliberating`;
       if (topic) topicEl.textContent = topic;
     },
 
