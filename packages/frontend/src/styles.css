@@ -970,9 +970,8 @@ body::after {
 /* ── Prediction Timeline ──────────────────────────────────────────── */
 .prediction-timeline-container {
   width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-  min-height: 250px;
+  min-height: 220px;
+  max-height: 300px;
   padding: 12px;
 }
 
@@ -1183,9 +1182,7 @@ body::after {
 .faction-map-svg {
   background: var(--parchment-deep);
   border-radius: var(--radius);
-  max-width: 700px;
-  margin: 0 auto;
-  display: block;
+  max-height: 320px;
 }
 
 /* ── Report Reveal Animation ─────────────────────────────────────── */

@@ -20,8 +20,8 @@ interface SimNode extends FactionNode { x: number; y: number; }
 interface SimEdge { source: SimNode; target: SimNode; weight: number; }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const VIEW_W = 600;
-const VIEW_H = 400;
+const VIEW_W = 700;
+const VIEW_H = 320;
 const MIN_R = 10;
 const MAX_R = 40;
 const LABEL_INSIDE_R = 28;
