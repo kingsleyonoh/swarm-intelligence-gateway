@@ -22,9 +22,9 @@ interface SimEdge { source: SimNode; target: SimNode; weight: number; }
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const VIEW_W = 600;
 const VIEW_H = 400;
-const MIN_R = 12;
-const MAX_R = 36;
-const LABEL_INSIDE_R = 22;
+const MIN_R = 10;
+const MAX_R = 40;
+const LABEL_INSIDE_R = 28;
 const WARMUP_TICKS = 60;
 
 export class FactionMapPanel implements Panel {

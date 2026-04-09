@@ -47,13 +47,13 @@ export interface ForceSimResult {
 }
 
 /** Minimum collision radius */
-const MIN_COLLISION = 18;
+const MIN_COLLISION = 25;
 
 /** Collision radius per member (scaled) */
-const COLLISION_SCALE = 0.02;
+const COLLISION_SCALE = 0.03;
 
 /** Base charge for many-body force */
-const BASE_CHARGE = -200;
+const BASE_CHARGE = -350;
 
 /** Extra repulsion for opposing stances */
 const OPPOSING_CHARGE = -400;
