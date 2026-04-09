@@ -195,7 +195,7 @@ export class PredictionTimelinePanel implements Panel {
   private clearPlotData(): void {
     if (!this.plotGroup) return;
     const dotsAndLines = this.plotGroup.querySelectorAll(
-      '.prediction-dot, .theater-line',
+      '.prediction-dot, .theater-line, .prediction-dot-label',
     );
     for (const el of dotsAndLines) {
       el.remove();
@@ -281,6 +281,9 @@ export class PredictionTimelinePanel implements Panel {
   private renderDots(): void {
     if (!this.plotGroup) return;
 
+    // Track which theaters have been labeled (one label per theater)
+    const labeledTheaters = new Set<string>();
+
     // Build jitter offsets for dots sharing the same timestamp
     const tsCounts = new Map<string, number>();
     const tsIndex = new Map<string, number>();
@@ -313,6 +316,21 @@ export class PredictionTimelinePanel implements Panel {
       circle.addEventListener('mouseleave', () => this.hideTooltip());
 
       this.plotGroup.appendChild(circle);
+
+      // Add theater label next to dot (only for first dot per theater to avoid clutter)
+      if (!labeledTheaters.has(point.theater)) {
+        labeledTheaters.add(point.theater);
+        const label = document.createElementNS(SVG_NS, 'text');
+        label.setAttribute('class', 'prediction-dot-label');
+        label.setAttribute('x', String(cx + DOT_RADIUS + 6));
+        label.setAttribute('y', String(cy + 4));
+        label.setAttribute('fill', color);
+        label.setAttribute('font-size', '10');
+        label.setAttribute('font-family', 'var(--font-data, monospace)');
+        const shortName = point.theater.length > 16 ? point.theater.slice(0, 14) + '...' : point.theater;
+        label.textContent = `${shortName} ${Math.round(point.confidence * 100)}%`;
+        this.plotGroup.appendChild(label);
+      }
     }
   }
 
