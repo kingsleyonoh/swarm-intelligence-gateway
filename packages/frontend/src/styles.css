@@ -939,9 +939,9 @@ body::after {
 }
 
 .faction-map-svg .faction-label {
-  font-family: var(--font-body);
+  font-family: var(--font-data);
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12px;
   pointer-events: none;
   fill: var(--ink) !important;
 }

@@ -215,13 +215,13 @@ export class FactionMapPanel implements Panel {
       // Truncate long labels
       const label = node.name.length > 18 ? node.name.slice(0, 16) + '...' : node.name;
       if (r >= LABEL_INSIDE_R) {
-        text.setAttribute('y', String(node.y + 4));
+        text.setAttribute('y', String(node.y + 5));
         text.setAttribute('fill', '#fff');
-        text.setAttribute('font-size', '9');
+        text.setAttribute('font-size', '11');
       } else {
-        text.setAttribute('y', String(node.y + r + 14));
-        text.setAttribute('fill', 'var(--ink-secondary, #5F6470)');
-        text.setAttribute('font-size', '10');
+        text.setAttribute('y', String(node.y + r + 16));
+        text.setAttribute('fill', '#33363F');
+        text.setAttribute('font-size', '12');
       }
       text.textContent = label;
       this.labelGroup.appendChild(text);
