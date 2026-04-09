@@ -17,16 +17,16 @@ import { eq, and } from 'drizzle-orm';
 
 import { SIMULATION_STATUS } from '../config/constants.js';
 import { env } from '../config/env.js';
-import { simulations, scenarios, predictions } from '../db/schema/tables.js';
+import { scenarios, simulations } from '../db/schema/tables.js';
 import { ConflictError, NotFoundError } from '../shared/errors.js';
 import { db } from '../shared/db.js';
-import { invalidatePattern } from '../shared/cache.js';
 import { createChildLogger } from '../shared/logger.js';
 import { generateSeedDocument } from '../transformer/seed-document.js';
 import type { SimPackage } from '../worldmonitor/types.js';
 
 import { MirofishClient } from './client.js';
-import { parsePredictions, type ParsedPrediction } from './prediction-parser.js';
+import { insertPredictions, storeActionLogs, storeProfiles } from './data-store.js';
+import { parsePredictions } from './prediction-parser.js';
 
 import type { MirofishConfig } from './types.js';
 
@@ -92,46 +92,6 @@ async function failSimulation(
     errorMessage,
     completedAt: new Date(),
   });
-}
-
-/**
- * Insert parsed predictions into the `predictions` table, scoped to the
- * owning tenant and simulation. The Drizzle schema declares `confidence`
- * as a decimal column, which maps to a string on insert.
- *
- * After a successful insert, the tenant's prediction cache is invalidated
- * so subsequent queries see the new rows. Cache invalidation failures are
- * logged but do NOT break the pipeline (5-minute TTL is the safety net).
- */
-async function insertPredictions(
-  simulationId: string,
-  tenantId: string,
-  parsed: ParsedPrediction[],
-): Promise<void> {
-  const rows = parsed.map((p) => ({
-    tenantId,
-    simulationId,
-    theater: p.theater,
-    predictionType: p.predictionType,
-    summary: p.summary,
-    confidence: p.confidence.toFixed(4),
-    timeHorizon: p.timeHorizon,
-    supportingFactions: p.supportingFactions,
-    dissentingFactions: p.dissentingFactions,
-  }));
-
-  await db.insert(predictions).values(rows);
-  log.info({ simulationId, count: rows.length }, 'Persisted predictions');
-
-  try {
-    const deleted = await invalidatePattern(`predictions:*:${tenantId}:*`);
-    log.debug({ tenantId, deleted }, 'Prediction cache invalidated');
-  } catch (err) {
-    log.warn(
-      { tenantId, error: (err as Error).message },
-      'Failed to invalidate prediction cache — will expire naturally',
-    );
-  }
 }
 
 // ── Public API ──────────────────────────────────────────────────────
@@ -266,14 +226,41 @@ export async function runSimulation(
     const createResult = await mirofishClient.createSimulation(mirofishProjectId);
     const mirofishSimId = createResult.data.simulation_id;
 
+    // Save MiroFish sim ID for later data fetching
+    await updateSimulationStatus(simulationId, SIMULATION_STATUS.SIMULATING, {
+      mirofishSimId,
+    });
+
     log.info({ simulationId, mirofishSimId }, 'Preparing simulation (profiles + config)');
     await mirofishClient.prepareSimulation(mirofishSimId);
     await mirofishClient.pollPrepareStatus(mirofishSimId, ONTOLOGY_TIMEOUT_MS);
+
+    // Fetch and store agent profiles generated during prepare
+    try {
+      const profiles = await mirofishClient.fetchProfiles(mirofishSimId);
+      if (profiles.length > 0) {
+        await storeProfiles(simulationId, tenantId, profiles);
+        log.info({ simulationId, count: profiles.length }, 'Stored agent profiles');
+      }
+    } catch (err) {
+      log.warn({ simulationId, err }, 'Failed to fetch profiles — continuing without');
+    }
 
     log.info({ simulationId, mirofishSimId }, 'Starting simulation');
     await mirofishClient.startSimulation(mirofishSimId, config);
 
     await mirofishClient.pollSimulationStatus(mirofishSimId, SIMULATION_TIMEOUT_MS);
+
+    // Fetch and store action logs from the completed simulation
+    try {
+      const actions = await mirofishClient.fetchActionLog(mirofishSimId);
+      if (actions.length > 0) {
+        await storeActionLogs(simulationId, tenantId, actions);
+        log.info({ simulationId, count: actions.length }, 'Stored agent action logs');
+      }
+    } catch (err) {
+      log.warn({ simulationId, err }, 'Failed to fetch action logs — continuing without');
+    }
 
     log.info({ simulationId, mirofishSimId }, 'Simulation phase complete');
 

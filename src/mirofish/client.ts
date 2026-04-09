@@ -14,7 +14,9 @@ import { request, FormData } from 'undici';
 import { createChildLogger } from '../shared/logger.js';
 
 import type {
+  ActionLogEntry,
   BuildResponse,
+  MirofishAgentProfile,
   MirofishConfig,
   OntologyGenerateResponse,
   TaskStatusResponse,
@@ -381,6 +383,59 @@ export class MirofishClient {
     const data = (response.data ?? response) as Record<string, unknown>;
     const report = (data.markdown_content as string) ?? (data.content as string) ?? (data.report as string) ?? JSON.stringify(data);
     return { report };
+  }
+
+  /**
+   * Fetch action logs for a completed simulation.
+   *
+   * `GET /api/simulation/:simId/actions` — returns agent action entries.
+   * MiroFish stores action logs as JSONL files; the API endpoint may
+   * return empty if file-serving is not wired up yet. Returns an empty
+   * array in that case (non-fatal).
+   */
+  async fetchActionLog(simId: string): Promise<ActionLogEntry[]> {
+    const res = await this.requestWithRetry<Record<string, unknown>>(
+      `${this.baseUrl}/api/simulation/${simId}/actions`,
+      { method: 'GET' },
+    );
+
+    const data = (res.data ?? res) as Record<string, unknown>;
+    const actions = data.actions as ActionLogEntry[] | undefined;
+
+    if (actions && actions.length > 0) {
+      return actions;
+    }
+
+    log.warn({ simId }, 'Action log API returned empty — agent episodes not available via API');
+    return [];
+  }
+
+  /**
+   * Fetch agent profiles for a simulation after the prepare phase.
+   *
+   * `GET /api/simulation/:simId/profiles` — returns generated agent profiles.
+   * MiroFish stores profiles as JSON files; the API endpoint may not exist
+   * yet. Returns an empty array gracefully on any failure.
+   */
+  async fetchProfiles(simId: string): Promise<MirofishAgentProfile[]> {
+    try {
+      const res = await this.requestWithRetry<Record<string, unknown>>(
+        `${this.baseUrl}/api/simulation/${simId}/profiles`,
+        { method: 'GET' },
+      );
+
+      const data = (res.data ?? res) as Record<string, unknown>;
+      const profiles = data.profiles as MirofishAgentProfile[] | undefined;
+
+      if (profiles && profiles.length > 0) {
+        return profiles;
+      }
+    } catch {
+      // API may not support this endpoint yet — non-fatal
+    }
+
+    log.warn({ simId }, 'Agent profiles not available via API');
+    return [];
   }
 
   // ── Private Helpers ───────────────────────────────────────────────

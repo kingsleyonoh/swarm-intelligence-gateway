@@ -1,0 +1,1 @@
+ALTER TABLE "simulations" ADD COLUMN "mirofish_sim_id" varchar(255);

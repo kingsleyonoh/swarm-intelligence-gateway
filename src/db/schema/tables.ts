@@ -78,6 +78,7 @@ export const simulations = pgTable(
       .references(() => scenarios.id),
     status: varchar('status', { length: 50 }).notNull().default('pending'),
     mirofishProjectId: varchar('mirofish_project_id', { length: 255 }),
+    mirofishSimId: varchar('mirofish_sim_id', { length: 255 }),
     agentCount: integer('agent_count').notNull().default(4096),
     roundCount: integer('round_count').notNull().default(5),
     llmProvider: varchar('llm_provider', { length: 100 }).notNull().default('deepseek'),

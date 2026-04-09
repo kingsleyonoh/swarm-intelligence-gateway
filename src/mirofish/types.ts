@@ -87,6 +87,25 @@ export interface ActionLogEntry {
   metadata: Record<string, unknown>;
 }
 
+// ── Agent Profile Types ────────────────────────────────────────────────
+
+/**
+ * Agent profile from MiroFish's profile generation phase.
+ *
+ * Returned by `GET /api/simulation/:simId/profiles` when available.
+ * MiroFish generates these during the prepare step and stores them as
+ * `reddit_profiles.json` inside the simulation directory.
+ */
+export interface MirofishAgentProfile {
+  user_id: number;
+  username: string;
+  name: string;
+  bio?: string;
+  persona?: string;
+  profession?: string;
+  country?: string;
+}
+
 // ── Client Configuration ────────────────────────────────────────────────
 
 /** Configuration passed to MiroFish simulation start. */
