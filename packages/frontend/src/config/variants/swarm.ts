@@ -28,12 +28,12 @@ export const swarmVariant: VariantConfig = {
       expanded: true,
     },
     {
-      id: 'faction-map',
+      id: 'prediction-timeline',
       order: 20,
       expanded: false,
     },
     {
-      id: 'prediction-timeline',
+      id: 'faction-map',
       order: 30,
       expanded: false,
     },

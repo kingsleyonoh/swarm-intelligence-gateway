@@ -95,8 +95,8 @@ describe('VariantLoader', () => {
     const result = loader.load(swarmVariant);
     expect(result.panels).toHaveLength(3);
     expect(result.panels[0].id).toBe('swarm-theater');
-    expect(result.panels[1].id).toBe('faction-map');
-    expect(result.panels[2].id).toBe('prediction-timeline');
+    expect(result.panels[1].id).toBe('prediction-timeline');
+    expect(result.panels[2].id).toBe('faction-map');
   });
 
   it('loads a variant config and returns resolved layers', () => {
@@ -114,8 +114,8 @@ describe('VariantLoader', () => {
     const ids = result.panels.map((p) => p.id);
     expect(ids).toEqual([
       'swarm-theater',
-      'faction-map',
       'prediction-timeline',
+      'faction-map',
     ]);
   });
 

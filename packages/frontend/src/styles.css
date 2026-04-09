@@ -347,9 +347,8 @@ body::after {
   width: 100%;
 }
 
-/* Hero panel (Swarm Theater) spans full width */
-#panel-container .panel:first-child { grid-column: 1 / -1; }
-/* Faction Map + Prediction Timeline sit side by side */
+/* All panels stack full width */
+#panel-container .panel { grid-column: 1 / -1; }
 
 /* ── Panel ────────────────────────────────────────────────────────── */
 .panel {

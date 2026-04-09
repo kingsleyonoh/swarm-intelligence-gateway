@@ -18,8 +18,8 @@ describe('swarm variant config', () => {
     const ids = panels.map((p) => p.id);
     expect(ids).toEqual([
       'swarm-theater',
-      'faction-map',
       'prediction-timeline',
+      'faction-map',
     ]);
   });
 
