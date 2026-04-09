@@ -208,21 +208,17 @@ export class FactionMapPanel implements Panel {
 
     for (const node of this.simNodes) {
       const r = this.scaleRadius(node.memberCount, minC, maxC);
+      // Only label large nodes (inside the circle) — small nodes use hover tooltip
+      if (r < LABEL_INSIDE_R) continue;
+
       const text = document.createElementNS(SVG_NS, 'text');
       text.setAttribute('class', 'faction-label');
       text.setAttribute('x', String(node.x));
+      text.setAttribute('y', String(node.y + 5));
       text.setAttribute('text-anchor', 'middle');
-      // Truncate long labels
-      const label = node.name.length > 18 ? node.name.slice(0, 16) + '...' : node.name;
-      if (r >= LABEL_INSIDE_R) {
-        text.setAttribute('y', String(node.y + 5));
-        text.setAttribute('fill', '#fff');
-        text.setAttribute('font-size', '11');
-      } else {
-        text.setAttribute('y', String(node.y + r + 16));
-        text.setAttribute('fill', '#33363F');
-        text.setAttribute('font-size', '12');
-      }
+      text.setAttribute('fill', '#fff');
+      text.setAttribute('font-size', '11');
+      const label = node.name.length > 14 ? node.name.slice(0, 12) + '...' : node.name;
       text.textContent = label;
       this.labelGroup.appendChild(text);
     }
