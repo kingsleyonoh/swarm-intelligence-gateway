@@ -135,8 +135,8 @@ export class PredictionTimelinePanel implements Panel {
       tick.setAttribute('x', '-8');
       tick.setAttribute('y', String(y + 4));
       tick.setAttribute('text-anchor', 'end');
-      tick.setAttribute('fill', '#666');
-      tick.setAttribute('font-size', '11');
+      tick.setAttribute('fill', '#33363F');
+      tick.setAttribute('font-size', '13');
       tick.textContent = `${Math.round(val * 100)}%`;
       this.plotGroup.appendChild(tick);
     }
@@ -147,8 +147,9 @@ export class PredictionTimelinePanel implements Panel {
     yLabel.setAttribute('y', '14');
     yLabel.setAttribute('text-anchor', 'middle');
     yLabel.setAttribute('transform', 'rotate(-90)');
-    yLabel.setAttribute('fill', '#666');
-    yLabel.setAttribute('font-size', '11');
+    yLabel.setAttribute('fill', '#33363F');
+    yLabel.setAttribute('font-size', '13');
+    yLabel.setAttribute('font-weight', '600');
     yLabel.textContent = 'Prediction Confidence';
     this.svgEl.appendChild(yLabel);
 
@@ -159,8 +160,9 @@ export class PredictionTimelinePanel implements Panel {
     xLabel.setAttribute('x', String(CHART_WIDTH / 2));
     xLabel.setAttribute('y', String(CHART_HEIGHT - 4));
     xLabel.setAttribute('text-anchor', 'middle');
-    xLabel.setAttribute('fill', '#666');
-    xLabel.setAttribute('font-size', '11');
+    xLabel.setAttribute('fill', '#33363F');
+    xLabel.setAttribute('font-size', '13');
+    xLabel.setAttribute('font-weight', '600');
     xLabel.textContent = 'Prediction Date';
     this.svgEl.appendChild(xLabel);
   }
@@ -185,8 +187,8 @@ export class PredictionTimelinePanel implements Panel {
       tick.setAttribute('x', String(x));
       tick.setAttribute('y', String(PLOT_H + 20));
       tick.setAttribute('text-anchor', 'middle');
-      tick.setAttribute('fill', '#666');
-      tick.setAttribute('font-size', '10');
+      tick.setAttribute('fill', '#33363F');
+      tick.setAttribute('font-size', '13');
       tick.textContent = label;
       this.plotGroup.appendChild(tick);
     }
