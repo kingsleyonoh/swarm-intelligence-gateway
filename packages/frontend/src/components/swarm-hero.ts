@@ -27,11 +27,18 @@ const PHASE_LABELS: Record<string, string> = {
   completed: 'PREDICTIONS EXTRACTED',
 };
 
+export interface StanceSummary {
+  total: number;
+  stances: { escalate: number; de_escalate: number; uncertain: number; neutral: number };
+}
+
 export interface SwarmHeroController {
   /** Switch to live mode with real simulation data */
-  setLive(phase: string, elapsedMs: number, topic?: string): void;
+  setLive(phase: string, elapsedMs: number, topic?: string, simId?: string): void;
   /** Update the displayed topic (from intelligence feed or scenario) */
   setTopic(topic: string): void;
+  /** Show real stance data from a completed simulation briefly */
+  showRealStances(summary: StanceSummary): void;
   /** Switch back to demo loop */
   setDemo(): void;
   destroy(): void;
@@ -89,13 +96,24 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
   let demoIdx = 0;
   let demoTimer: ReturnType<typeof setTimeout> | null = null;
 
+  let showingRealStances = false;
+  let realStanceTimer: ReturnType<typeof setTimeout> | null = null;
+
   // Update stance distribution counter every 500ms
   const stanceInterval = setInterval(() => {
-    if (!canvas) return;
-    const dist = canvas.getDistribution();
+    if (!canvas || showingRealStances) return;
     const phase = canvas ? 'active' : 'idle';
-    // Only show during simulating or reporting phases (when particles have colors)
-    if (phase === 'active' && (demoIdx >= 1 || isLive)) {
+
+    if (isLive) {
+      // During live mode, show "ANALYZING..." instead of fake numbers
+      stanceBar.innerHTML = [
+        '<span class="stance-item stance-esc">ANALYZING...</span>',
+        '<span class="stance-item stance-deesc">ANALYZING...</span>',
+        '<span class="stance-item stance-market">ANALYZING...</span>',
+        '<span class="stance-item stance-sent">ANALYZING...</span>',
+      ].join('');
+    } else if (phase === 'active' && demoIdx >= 1) {
+      const dist = canvas.getDistribution();
       stanceBar.innerHTML = [
         `<span class="stance-item stance-esc">ESCALATION ${dist.escalation}%</span>`,
         `<span class="stance-item stance-deesc">DE-ESCALATION ${dist.deEscalation}%</span>`,
@@ -133,7 +151,7 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
   demoTimer = setTimeout(advanceDemo, DEMO_TIMING[0].durationMs);
 
   return {
-    setLive(phase: string, elapsedMs: number, topic?: string): void {
+    setLive(phase: string, elapsedMs: number, topic?: string, _simId?: string): void {
       if (!isLive) {
         isLive = true;
         clearDemoTimer();
@@ -150,9 +168,30 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
       topicEl.textContent = topic;
     },
 
+    showRealStances(summary: StanceSummary): void {
+      if (summary.total === 0) return;
+      showingRealStances = true;
+      const s = summary.stances;
+      stanceBar.innerHTML = [
+        `<span class="stance-item stance-esc">ESCALATION ${s.escalate}%</span>`,
+        `<span class="stance-item stance-deesc">DE-ESCALATION ${s.de_escalate}%</span>`,
+        `<span class="stance-item stance-market">MARKET SHIFT ${s.uncertain}%</span>`,
+        `<span class="stance-item stance-sent">SENTIMENT ${s.neutral}%</span>`,
+      ].join('');
+
+      // Revert after 10 seconds
+      if (realStanceTimer) clearTimeout(realStanceTimer);
+      realStanceTimer = setTimeout(() => {
+        showingRealStances = false;
+        realStanceTimer = null;
+      }, 10_000);
+    },
+
     setDemo(): void {
       if (isLive) {
         isLive = false;
+        showingRealStances = false;
+        if (realStanceTimer) { clearTimeout(realStanceTimer); realStanceTimer = null; }
         wrapper.classList.remove('swarm-hero--live');
         elapsed.textContent = '';
         subtitle.textContent = '4,096 AI agents reaching consensus';
@@ -171,6 +210,7 @@ export function createSwarmHero(container: HTMLElement): SwarmHeroController {
     destroy(): void {
       clearDemoTimer();
       clearInterval(stanceInterval);
+      if (realStanceTimer) { clearTimeout(realStanceTimer); realStanceTimer = null; }
       if (canvas) { canvas.destroy(); canvas = null; }
       if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
     },

@@ -10,6 +10,7 @@ import { scenarioRoutes } from './routes/scenarios.js';
 import { predictionRoutes } from './routes/predictions.js';
 import { intelligenceRoutes } from './routes/intelligence.js';
 import { quickLaunchRoutes } from './routes/quick-launch.js';
+import { agentDataRoutes } from './routes/agent-data.js';
 
 /**
  * Build and configure the Fastify application instance.
@@ -35,6 +36,7 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
   app.register(intelligenceRoutes);
   app.register(tenantRoutes);
   app.register(quickLaunchRoutes);
+  app.register(agentDataRoutes);
   app.register(simulationActionRoutes);
   app.register(simulationRoutes);
   app.register(scenarioRoutes);

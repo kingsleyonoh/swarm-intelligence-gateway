@@ -33,6 +33,7 @@ import { createScenarioSelector } from './components/scenario-selector.js';
 import type { Panel, MapLayerConstructor } from './types.js';
 import type { PredictionPoint } from './components/prediction-types.js';
 import type { IntelligenceData } from './components/intelligence-types.js';
+import type { StanceSummary } from './components/swarm-hero.js';
 
 // Phase 1: Initialize registries
 const panelRegistry = new PanelRegistry();
@@ -96,9 +97,9 @@ if (panelContainer) {
         headers: { 'X-API-Key': key },
       }).then((r) => r.json()).then((prog: { elapsedMs?: number; status?: string }) => {
         const topic = detail.theater !== 'Simulation Theater' ? `ANALYZING: ${detail.theater}` : '';
-        swarmHero?.setLive(prog.status ?? detail.status, prog.elapsedMs ?? 0, topic);
+        swarmHero?.setLive(prog.status ?? detail.status, prog.elapsedMs ?? 0, topic, detail.id);
       }).catch(() => {
-        swarmHero?.setLive(detail.status, 0);
+        swarmHero?.setLive(detail.status, 0, undefined, detail.id);
       });
       // Fetch scenario title once per simulation
       if (detail.id !== lastActiveSimId) {
@@ -122,7 +123,27 @@ if (panelContainer) {
   }) as EventListener);
 
   document.addEventListener('simulation-idle', () => {
-    swarmHero?.setDemo();
+    // If we had an active simulation, fetch its stance summary before demo
+    if (lastActiveSimId && swarmHero) {
+      const base = swarmVariant.apiBaseUrl || window.location.origin;
+      const key = (import.meta as unknown as Record<string, Record<string, string>>).env?.VITE_API_KEY ?? '';
+      fetch(`${base}/api/simulations/${lastActiveSimId}/agents/summary`, {
+        headers: { 'X-API-Key': key },
+      })
+        .then((r) => r.json())
+        .then((summary: StanceSummary) => {
+          swarmHero?.showRealStances(summary);
+          // Switch to demo after showing real stances (10s)
+          setTimeout(() => {
+            swarmHero?.setDemo();
+          }, 10_000);
+        })
+        .catch(() => {
+          swarmHero?.setDemo();
+        });
+    } else {
+      swarmHero?.setDemo();
+    }
     scenarioSelector.setSimulationActive(false);
   });
 }
