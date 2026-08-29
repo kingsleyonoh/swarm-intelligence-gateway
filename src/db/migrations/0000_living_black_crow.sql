@@ -9,7 +9,6 @@ CREATE TABLE "agent_episodes" (
 	"action_type" varchar(50) NOT NULL,
 	"content" text NOT NULL,
 	"embedding" vector(384),
-	"source_key" varchar(512),
 	"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -39,8 +38,7 @@ CREATE TABLE "graph_edges" (
 	"edge_type" varchar(100) NOT NULL,
 	"properties" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"weight" numeric(5, 4) DEFAULT '1.0',
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "uq_graph_edges_sim_relation" UNIQUE("simulation_id","source_node_id","target_node_id","edge_type")
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "graph_nodes" (
