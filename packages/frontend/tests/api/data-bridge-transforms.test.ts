@@ -72,3 +72,25 @@ describe('transformSimulations — status passthrough', () => {
     expect(result[0].status).toBeUndefined();
   });
 });
+
+describe('transformPredictions — upstream language passthrough', () => {
+  it('keeps predictions when the upstream report contains non-English text', () => {
+    const result = transformPredictions({
+      data: [
+        {
+          id: 'pred-cjk',
+          simulationId: 'sim-live',
+          theater: 'Strait of Hormuz',
+          predictionType: 'market_shift',
+          summary: '市场溢出风险在未来72小时内上升。',
+          confidence: '0.65',
+          timeHorizon: '72h',
+          createdAt: '2026-08-28T15:23:14Z',
+        },
+      ],
+    });
+
+    expect(result.predictions).toHaveLength(1);
+    expect(result.predictions[0].summary).toContain('市场溢出风险');
+  });
+});

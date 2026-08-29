@@ -20,10 +20,8 @@ import type {
 } from './types.js';
 
 /**
- * Custom PostgreSQL + pgvector graph store — replaces Zep Cloud for
- * simulation memory (nodes, edges, agent episodes). All queries are
- * tenant-scoped through the `simulation_id` column, which is itself
- * tenant-scoped upstream.
+ * Custom PostgreSQL + pgvector graph store for simulation memory.
+ * Every read and write carries the tenant ID explicitly.
  *
  * Embeddings are generated via `src/shared/embeddings.ts` (384-dim
  * all-MiniLM-L6-v2) when callers omit them, so the module is usable
@@ -102,6 +100,15 @@ export async function upsertEdge(edge: GraphEdge): Promise<string> {
   const [inserted] = await db
     .insert(graphEdges)
     .values(row)
+    .onConflictDoUpdate({
+      target: [
+        graphEdges.simulationId,
+        graphEdges.sourceNodeId,
+        graphEdges.targetNodeId,
+        graphEdges.edgeType,
+      ],
+      set: { properties: row.properties, weight: row.weight },
+    })
     .returning({ id: graphEdges.id });
 
   log.debug({ edgeId: inserted.id, edgeType: edge.edgeType }, 'Inserted graph edge');
@@ -128,13 +135,29 @@ export async function addEpisode(episode: AgentEpisode): Promise<string> {
     actionType: episode.actionType,
     content: episode.content,
     embedding,
+    sourceKey: episode.sourceKey,
     metadata: episode.metadata ?? {},
   };
 
-  const [inserted] = await db
-    .insert(agentEpisodes)
-    .values(row)
-    .returning({ id: agentEpisodes.id });
+  const insert = db.insert(agentEpisodes).values(row);
+  const [inserted] = episode.sourceKey
+    ? await insert
+      .onConflictDoNothing({ target: [agentEpisodes.simulationId, agentEpisodes.sourceKey] })
+      .returning({ id: agentEpisodes.id })
+    : await insert.returning({ id: agentEpisodes.id });
+
+  if (!inserted && episode.sourceKey) {
+    const [existing] = await db
+      .select({ id: agentEpisodes.id })
+      .from(agentEpisodes)
+      .where(and(
+        eq(agentEpisodes.tenantId, episode.tenantId),
+        eq(agentEpisodes.simulationId, episode.simulationId),
+        eq(agentEpisodes.sourceKey, episode.sourceKey),
+      ));
+    if (existing) return existing.id;
+    throw new Error(`Episode insert returned no row for source key ${episode.sourceKey}`);
+  }
 
   log.debug(
     { episodeId: inserted.id, agentId: episode.agentId, round: episode.roundNumber },
@@ -150,6 +173,7 @@ export async function addEpisode(episode: AgentEpisode): Promise<string> {
  * Backed by the `idx_graph_nodes_type` index.
  */
 export async function getNodesByType(
+  tenantId: string,
   simulationId: string,
   entityType: string,
 ): Promise<GraphNode[]> {
@@ -157,7 +181,11 @@ export async function getNodesByType(
     .select()
     .from(graphNodes)
     .where(
-      and(eq(graphNodes.simulationId, simulationId), eq(graphNodes.entityType, entityType)),
+      and(
+        eq(graphNodes.tenantId, tenantId),
+        eq(graphNodes.simulationId, simulationId),
+        eq(graphNodes.entityType, entityType),
+      ),
     );
 
   return rows.map(rowToGraphNode);
@@ -172,7 +200,8 @@ export async function getNodesByType(
  * direction counts as an adjacency) because swarm influence flows
  * both ways along relationship edges.
  */
-export async function getNeighbors(nodeId: string, depth = 1): Promise<GraphNode[]> {
+export async function getNeighbors(tenantId: string, nodeId: string, depth = 1): Promise<GraphNode[]> {
+  const safeDepth = Math.max(1, Math.min(20, Math.floor(depth)));
   const result = await db.execute(sql`
     WITH RECURSIVE reachable(id, hop) AS (
       SELECT ${nodeId}::uuid, 0
@@ -186,12 +215,14 @@ export async function getNeighbors(nodeId: string, depth = 1): Promise<GraphNode
       FROM reachable r
       JOIN graph_edges ge
         ON ge.source_node_id = r.id OR ge.target_node_id = r.id
-      WHERE r.hop < ${depth}
+      WHERE ge.tenant_id = ${tenantId}::uuid
+        AND r.hop < ${safeDepth}
     )
     SELECT DISTINCT n.*
     FROM graph_nodes n
     JOIN reachable r ON n.id = r.id
     WHERE n.id != ${nodeId}::uuid
+      AND n.tenant_id = ${tenantId}::uuid
   `);
 
   // `db.execute` returns a RowList of raw objects — map to GraphNode
@@ -210,6 +241,7 @@ export async function getNeighbors(nodeId: string, depth = 1): Promise<GraphNode
  * the report phase.
  */
 export async function searchEpisodes(
+  tenantId: string,
   simulationId: string,
   agentId: number | null,
   query: string,
@@ -220,6 +252,7 @@ export async function searchEpisodes(
 
   const agentFilter =
     agentId !== null ? sql`AND agent_id = ${agentId}` : sql``;
+  const safeTopK = Math.max(1, Math.min(100, Math.floor(topK)));
 
   const result = await db.execute(sql`
     SELECT
@@ -233,22 +266,20 @@ export async function searchEpisodes(
       metadata,
       embedding <=> ${vectorLiteral}::vector AS distance
     FROM agent_episodes
-    WHERE simulation_id = ${simulationId}::uuid
+    WHERE tenant_id = ${tenantId}::uuid
+      AND simulation_id = ${simulationId}::uuid
       ${agentFilter}
     ORDER BY distance ASC
-    LIMIT ${topK}
+    LIMIT ${safeTopK}
   `);
 
   const rows = Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? []);
   return (rows as Record<string, unknown>[]).map(rawRowToEpisodeResult);
 }
 
-/**
- * Return every episode for a specific agent in a simulation,
- * ordered by `round_number` ascending. Used by the orchestrator to
- * assemble an agent's full action history for end-of-run analysis.
- */
+/** Return every episode for one tenant's agent, ordered by round. */
 export async function getAgentMemory(
+  tenantId: string,
   simulationId: string,
   agentId: number,
 ): Promise<AgentEpisode[]> {
@@ -256,12 +287,13 @@ export async function getAgentMemory(
     .select()
     .from(agentEpisodes)
     .where(
-      and(eq(agentEpisodes.simulationId, simulationId), eq(agentEpisodes.agentId, agentId)),
+      and(
+        eq(agentEpisodes.tenantId, tenantId),
+        eq(agentEpisodes.simulationId, simulationId),
+        eq(agentEpisodes.agentId, agentId),
+      ),
     )
     .orderBy(asc(agentEpisodes.roundNumber));
 
   return rows.map(rowToAgentEpisode);
 }
-
-// Row mapping helpers live in `./row-mappers.ts` (extracted for
-// modularity — graph-store.ts stays under 300 lines).

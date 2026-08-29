@@ -67,8 +67,11 @@ export async function readIntelligence(): Promise<IntelligencePayload> {
     if (wmRedis) {
       try {
         await wmRedis.quit();
-      } catch {
-        // Ignore quit errors — connection may already be closed
+      } catch (error) {
+        log.debug(
+          { error: error instanceof Error ? error.message : String(error) },
+          'WorldMonitor Redis connection was already closed',
+        );
       }
     }
   }
@@ -137,8 +140,11 @@ async function readForecasts(redis: Redis): Promise<ForecastPrediction[]> {
       timeHorizon: p.timeHorizon,
       signalCount: Array.isArray(p.signals) ? p.signals.length : 0,
     }));
-  } catch {
-    log.warn('Failed to parse forecast history entry');
+  } catch (error) {
+    log.warn(
+      { error: error instanceof Error ? error.message : String(error) },
+      'Failed to parse forecast history entry',
+    );
     return [];
   }
 }

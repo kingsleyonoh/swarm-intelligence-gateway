@@ -65,6 +65,10 @@ export const envSchema = z.object({
   // ── Optional strings ──────────────────────────────────────────────
   WORLDMONITOR_REDIS_URL: optionalString,
   WORLDMONITOR_REDIS_TOKEN: optionalString,
+  WORLDMONITOR_R2_ACCOUNT_ID: optionalString,
+  WORLDMONITOR_R2_BUCKET: optionalString,
+  WORLDMONITOR_R2_API_TOKEN: optionalString,
+  WORLDMONITOR_R2_API_BASE_URL: optionalString,
   MIROFISH_API_URL: optionalString,
   DEEPSEEK_API_KEY: optionalString,
   NOTIFICATION_HUB_URL: optionalString,

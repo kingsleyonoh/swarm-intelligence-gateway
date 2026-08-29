@@ -14,7 +14,7 @@ import { ValidationError } from '../../shared/errors.js';
 import { scenarios, simulations } from '../../db/schema/tables.js';
 import { SIMULATION_STATUS } from '../../config/constants.js';
 import { env } from '../../config/env.js';
-import { authGuard, type RequestTenant } from '../middleware/auth.js';
+import { authGuard, requireTenant } from '../middleware/auth.js';
 import {
   findTemplate,
   getTemplateSummaries,
@@ -41,7 +41,7 @@ export async function quickLaunchRoutes(
     '/api/simulations/launch',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const parsed = launchSchema.safeParse(request.body);
       if (!parsed.success) {

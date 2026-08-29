@@ -180,7 +180,7 @@ export function createLiveFeed(
   // Initial fetch
   fetchActions(simId, apiKey, baseUrl)
     .then((result) => renderActions(result.data))
-    .catch(() => { /* handled gracefully — empty list shown */ });
+    .catch((error) => console.warn('[swarm] Initial live feed load failed:', error));
 
   // Poll every 5 seconds
   pollTimer = setInterval(() => {
@@ -199,7 +199,7 @@ export function createLiveFeed(
           );
         }
       })
-      .catch(() => { /* network error — retry on next poll */ });
+      .catch((error) => console.warn('[swarm] Live feed poll failed; retrying:', error));
   }, 5000);
 
   return container;

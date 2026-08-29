@@ -45,6 +45,7 @@ export function rowToAgentEpisode(
     content: row.content,
     metadata: (row.metadata as Record<string, unknown>) ?? {},
     embedding: row.embedding ?? undefined,
+    sourceKey: row.sourceKey ?? undefined,
   };
 }
 

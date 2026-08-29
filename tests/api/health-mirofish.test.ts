@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
-import { checkServiceReachable } from '../../src/api/routes/health.js';
+import { checkServiceReachable, readinessStatus } from '../../src/api/routes/health.js';
 
 /**
  * Tests for the MiroFish / upstream service reachability check.
@@ -93,3 +93,12 @@ describe('checkServiceReachable', () => {
   });
 });
 
+describe('readinessStatus', () => {
+  it('degrades when a configured MiroFish service is unavailable', () => {
+    expect(readinessStatus(true, true, 'error')).toBe('degraded');
+  });
+
+  it('accepts an unconfigured MiroFish service in local development', () => {
+    expect(readinessStatus(true, true, 'unconfigured')).toBe('ok');
+  });
+});

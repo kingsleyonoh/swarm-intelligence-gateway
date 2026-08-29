@@ -13,7 +13,7 @@
  * X-Webhook-Secret header.
  */
 
-import { and, desc, eq, lt } from 'drizzle-orm';
+import { and, desc, eq, lt, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 
 import { db } from '../../shared/db.js';
@@ -28,7 +28,7 @@ import { scenarios } from '../../db/schema/tables.js';
 import { SCENARIO_SOURCE } from '../../config/constants.js';
 import { env } from '../../config/env.js';
 import { parseSimPackage } from '../../worldmonitor/parser.js';
-import { authGuard, type RequestTenant } from '../middleware/auth.js';
+import { authGuard, requireTenant } from '../middleware/auth.js';
 
 // ── Routes ─────────────────────────────────────────────────────────────
 
@@ -38,7 +38,7 @@ export async function scenarioRoutes(app: FastifyInstance): Promise<void> {
     '/api/scenarios',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const parsed = paginationSchema.safeParse(request.query);
       if (!parsed.success) {
@@ -54,12 +54,19 @@ export async function scenarioRoutes(app: FastifyInstance): Promise<void> {
 
       if (cursor) {
         const [cursorRow] = await db
-          .select({ createdAt: scenarios.createdAt })
+          .select({ id: scenarios.id, createdAt: scenarios.createdAt })
           .from(scenarios)
-          .where(eq(scenarios.id, cursor));
+          .where(and(eq(scenarios.id, cursor), eq(scenarios.tenantId, tenant.id)));
 
         if (cursorRow) {
-          conditions.push(lt(scenarios.createdAt, cursorRow.createdAt));
+          const cursorCondition = or(
+            lt(scenarios.createdAt, cursorRow.createdAt),
+            and(
+              eq(scenarios.createdAt, cursorRow.createdAt),
+              lt(scenarios.id, cursorRow.id),
+            ),
+          );
+          if (cursorCondition) conditions.push(cursorCondition);
         }
       }
 
@@ -73,7 +80,7 @@ export async function scenarioRoutes(app: FastifyInstance): Promise<void> {
         })
         .from(scenarios)
         .where(and(...conditions))
-        .orderBy(desc(scenarios.createdAt))
+        .orderBy(desc(scenarios.createdAt), desc(scenarios.id))
         .limit(limit + 1);
 
       const hasMore = rows.length > limit;
@@ -90,7 +97,7 @@ export async function scenarioRoutes(app: FastifyInstance): Promise<void> {
     '/api/scenarios/ingest',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       // Optional Webhook Engine secret verification
       if (env.WEBHOOK_SECRET) {
@@ -150,7 +157,7 @@ export async function scenarioRoutes(app: FastifyInstance): Promise<void> {
     '/api/scenarios/:id',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const idParse = uuidSchema.safeParse(request.params.id);
       if (!idParse.success) {

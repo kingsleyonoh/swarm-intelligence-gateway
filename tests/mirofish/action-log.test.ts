@@ -63,6 +63,38 @@ describe('MirofishClient data-fetching', () => {
   // ── fetchActionLog ──────────────────────────────────────────────────
 
   describe('fetchActionLog', () => {
+    it('normalizes MiroFish action records with round_num and action_args', async () => {
+      mocks.request.mockResolvedValue(
+        mockResponse(200, {
+          data: {
+            actions: [{
+              agent_id: 7,
+              agent_name: 'Analyst Seven',
+              round_num: 3,
+              platform: 'twitter',
+              action_type: 'CREATE_POST',
+              action_args: { content: 'A market shock is likely', target: 'oil' },
+              result: { post_id: 'post-7' },
+              success: true,
+              timestamp: '2026-08-28T10:00:00Z',
+            }],
+          },
+        }),
+      );
+
+      await expect(client.fetchActionLog('sim_abc123')).resolves.toEqual([{
+        agent_id: 7,
+        agent_name: 'Analyst Seven',
+        round: 3,
+        platform: 'twitter',
+        action_type: 'CREATE_POST',
+        content: 'A market shock is likely',
+        action_args: { content: 'A market shock is likely', target: 'oil' },
+        timestamp: '2026-08-28T10:00:00Z',
+        metadata: { result: { post_id: 'post-7' }, success: true },
+      }]);
+    });
+
     it('should return parsed actions when API returns data', async () => {
       const actions: ActionLogEntry[] = [
         {
@@ -119,6 +151,26 @@ describe('MirofishClient data-fetching', () => {
       const result = await client.fetchActionLog('sim_abc123');
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('fetchGraphData', () => {
+    it('unwraps graph data returned by the current MiroFish endpoint', async () => {
+      mocks.request.mockResolvedValue(mockResponse(200, {
+        data: {
+          graph_id: 'graph-1',
+          nodes: [{ uuid: 'node-1', name: 'Iran', labels: ['StateActor'] }],
+          edges: [],
+          node_count: 1,
+          edge_count: 0,
+        },
+      }));
+
+      await expect(client.fetchGraphData('graph-1')).resolves.toEqual({
+        graphId: 'graph-1',
+        nodes: [{ uuid: 'node-1', name: 'Iran', labels: ['StateActor'] }],
+        edges: [],
+      });
     });
   });
 

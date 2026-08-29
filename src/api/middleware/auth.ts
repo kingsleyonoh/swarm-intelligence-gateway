@@ -17,6 +17,12 @@ export interface RequestTenant {
   updatedAt: Date;
 }
 
+declare module 'fastify' {
+  interface FastifyRequest {
+    tenant: RequestTenant | null;
+  }
+}
+
 /**
  * Register the `request.tenant` decorator and the `authGuard` hook.
  *
@@ -62,5 +68,13 @@ export async function authGuard(
     throw new ForbiddenError('Tenant is inactive');
   }
 
-  (request as any).tenant = tenant;
+  request.tenant = tenant;
+}
+
+/** Read the tenant resolved by `authGuard` inside a protected route. */
+export function requireTenant(request: FastifyRequest): RequestTenant {
+  if (!request.tenant) {
+    throw new UnauthorizedError('Authentication required');
+  }
+  return request.tenant;
 }

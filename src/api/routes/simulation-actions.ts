@@ -1,15 +1,4 @@
-/**
- * Simulation action + sub-resource routes.
- *
- * These are pulled out of `simulations.ts` to keep each file focused and
- * under the 300-line limit.
- *
- *   GET  /api/simulations/:id/report    — completed simulation report + predictions
- *   GET  /api/simulations/:id/progress — live progress (status, elapsed, phase)
- *   POST /api/simulations/:id/cancel   — cancel a running simulation
- */
-
-import { and, desc, eq, gt } from 'drizzle-orm';
+import { and, desc, eq, gt, lt, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -27,30 +16,24 @@ import {
   simulations,
 } from '../../db/schema/tables.js';
 import { SIMULATION_STATUS } from '../../config/constants.js';
-import { authGuard, type RequestTenant } from '../middleware/auth.js';
-
-// ── Helpers ─────────────────────────────────────────────────────────────
-
+import { authGuard, requireTenant } from '../middleware/auth.js';
 const TERMINAL_STATUSES = new Set<string>([
   SIMULATION_STATUS.COMPLETED,
   SIMULATION_STATUS.FAILED,
   SIMULATION_STATUS.CANCELLED,
 ]);
-
 const actionsQuerySchema = z.object({
+  cursor: z.string().uuid().optional(),
   since: z.string().datetime().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
-// ── Routes ──────────────────────────────────────────────────────────────
-
 export async function simulationActionRoutes(app: FastifyInstance): Promise<void> {
-  // ── GET /api/simulations/:id/actions ────────────────────────────────
-  app.get<{ Params: { id: string }; Querystring: { since?: string; limit?: string } }>(
+  app.get<{ Params: { id: string }; Querystring: { cursor?: string; since?: string; limit?: string } }>(
     '/api/simulations/:id/actions',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const idParse = uuidSchema.safeParse(request.params.id);
       if (!idParse.success) {
@@ -62,9 +45,8 @@ export async function simulationActionRoutes(app: FastifyInstance): Promise<void
       if (!queryParse.success) {
         throw new ValidationError('Invalid query parameters');
       }
-      const { since, limit } = queryParse.data;
+      const { cursor, since, limit } = queryParse.data;
 
-      // Verify simulation exists and belongs to tenant
       const [sim] = await db
         .select({ id: simulations.id })
         .from(simulations)
@@ -82,6 +64,26 @@ export async function simulationActionRoutes(app: FastifyInstance): Promise<void
       ];
       if (since) {
         conditions.push(gt(agentEpisodes.createdAt, new Date(since)));
+      }
+      if (cursor) {
+        const [cursorRow] = await db
+          .select({ id: agentEpisodes.id, createdAt: agentEpisodes.createdAt })
+          .from(agentEpisodes)
+          .where(and(
+            eq(agentEpisodes.id, cursor),
+            eq(agentEpisodes.simulationId, id),
+            eq(agentEpisodes.tenantId, tenant.id),
+          ));
+        if (cursorRow) {
+          const cursorCondition = or(
+            lt(agentEpisodes.createdAt, cursorRow.createdAt),
+            and(
+              eq(agentEpisodes.createdAt, cursorRow.createdAt),
+              lt(agentEpisodes.id, cursorRow.id),
+            ),
+          );
+          if (cursorCondition) conditions.push(cursorCondition);
+        }
       }
 
       const rows = await db
@@ -101,10 +103,11 @@ export async function simulationActionRoutes(app: FastifyInstance): Promise<void
           and(
             eq(agentProfiles.simulationId, agentEpisodes.simulationId),
             eq(agentProfiles.agentId, agentEpisodes.agentId),
+            eq(agentProfiles.tenantId, tenant.id),
           ),
         )
         .where(and(...conditions))
-        .orderBy(desc(agentEpisodes.createdAt))
+        .orderBy(desc(agentEpisodes.createdAt), desc(agentEpisodes.id))
         .limit(limit + 1);
 
       const hasMore = rows.length > limit;
@@ -122,17 +125,16 @@ export async function simulationActionRoutes(app: FastifyInstance): Promise<void
           createdAt: row.createdAt,
         })),
         hasMore,
+        nextCursor: hasMore ? data[data.length - 1]?.id ?? null : null,
       });
     },
   );
 
-  // ── GET /api/simulations/:id/report ─────────────────────────────────
-  // Registered BEFORE /:id so Fastify matches the longer path first.
   app.get<{ Params: { id: string } }>(
     '/api/simulations/:id/report',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const idParse = uuidSchema.safeParse(request.params.id);
       if (!idParse.success) {
@@ -191,13 +193,11 @@ export async function simulationActionRoutes(app: FastifyInstance): Promise<void
     },
   );
 
-  // ── GET /api/simulations/:id/progress ────────────────────────────────
-  // Live progress for a simulation: status, elapsed time, phase label.
   app.get<{ Params: { id: string } }>(
     '/api/simulations/:id/progress',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const idParse = uuidSchema.safeParse(request.params.id);
       if (!idParse.success) {
@@ -254,14 +254,11 @@ export async function simulationActionRoutes(app: FastifyInstance): Promise<void
     },
   );
 
-  // ── POST /api/simulations/:id/cancel ────────────────────────────────
-  // Cancel a pending/queued/running simulation. Already-completed,
-  // already-cancelled, or failed simulations return 409 Conflict.
   app.post<{ Params: { id: string } }>(
     '/api/simulations/:id/cancel',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const idParse = uuidSchema.safeParse(request.params.id);
       if (!idParse.success) {
@@ -295,7 +292,7 @@ export async function simulationActionRoutes(app: FastifyInstance): Promise<void
           status: SIMULATION_STATUS.CANCELLED,
           completedAt: new Date(),
         })
-        .where(eq(simulations.id, id));
+        .where(and(eq(simulations.id, id), eq(simulations.tenantId, tenant.id)));
 
       return reply.send({ status: SIMULATION_STATUS.CANCELLED });
     },

@@ -15,7 +15,7 @@ const log = createChildLogger({ module: 'health' });
 async function checkDb(): Promise<{ ok: boolean; latencyMs: number }> {
   const start = performance.now();
   try {
-    await db.execute('SELECT 1' as any);
+    await db.execute('SELECT 1');
     return { ok: true, latencyMs: Math.round(performance.now() - start) };
   } catch (err) {
     log.warn({ err }, 'DB health check failed');
@@ -62,6 +62,14 @@ export async function checkServiceReachable(
     log.warn({ err, url }, 'Service reachability check failed');
     return 'error';
   }
+}
+
+export function readinessStatus(
+  dbOk: boolean,
+  redisOk: boolean,
+  mirofishStatus: 'ok' | 'error' | 'unconfigured',
+): 'ok' | 'degraded' {
+  return dbOk && redisOk && mirofishStatus !== 'error' ? 'ok' : 'degraded';
 }
 
 /**
@@ -122,10 +130,11 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
       mirofish: mirofishStatus,
     };
 
-    // Degraded if any core service (db, redis) is down
-    // MiroFish "unconfigured" does not cause degraded status
-    const coreHealthy = services.db === 'ok' && services.redis === 'ok';
-    const status = coreHealthy ? 'ok' : 'degraded';
+    const status = readinessStatus(
+      services.db === 'ok',
+      services.redis === 'ok',
+      mirofishStatus,
+    );
 
     return reply.send({ status, services });
   });

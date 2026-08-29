@@ -35,7 +35,7 @@ services:
     volumes:
       - pg_dev_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U swarm"]
+      test: ["CMD-SHELL", "pg_isready -U swarm -d swarm_gateway"]
       interval: 10s
       timeout: 5s
       retries: 5

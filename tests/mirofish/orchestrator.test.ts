@@ -63,6 +63,7 @@ const mocks = vi.hoisted(() => {
   const generateReport = vi.fn();
   const pollReportStatus = vi.fn();
   const getReport = vi.fn();
+  const fetchGraphData = vi.fn();
 
   // DB mock
   const dbSelect = vi.fn();
@@ -81,6 +82,7 @@ const mocks = vi.hoisted(() => {
     generateReport,
     pollReportStatus,
     getReport,
+    fetchGraphData,
     dbSelect,
     dbInsert,
     dbUpdate,
@@ -101,7 +103,12 @@ vi.mock('../../src/mirofish/client.js', () => ({
     generateReport = mocks.generateReport;
     pollReportStatus = mocks.pollReportStatus;
     getReport = mocks.getReport;
+    fetchGraphData = mocks.fetchGraphData;
   },
+}));
+
+vi.mock('../../src/memory/graph-ingest.js', () => ({
+  storeMirofishGraph: vi.fn(),
 }));
 
 // Mock DB module
@@ -195,7 +202,11 @@ function setupSuccessfulDbMocks() {
 function setupSuccessfulMirofishMocks() {
   mocks.generateOntology.mockResolvedValue({ data: { project_id: 'mf-proj-001' }, success: true });
   mocks.buildGraph.mockResolvedValue({ data: { task_id: 'build-task-001', project_id: 'mf-proj-001', message: 'ok' }, success: true });
-  mocks.pollTask.mockResolvedValue(undefined);
+  mocks.fetchGraphData.mockResolvedValue({ graphId: 'graph-001', nodes: [], edges: [] });
+  mocks.pollTask.mockResolvedValue({
+    status: 'completed',
+    result: { graph_id: 'graph-001' },
+  });
   mocks.createSimulation.mockResolvedValue({ data: { simulation_id: 'mf-sim-001', status: 'created' }, success: true });
   mocks.prepareSimulation.mockResolvedValue({ success: true });
   mocks.pollPrepareStatus.mockResolvedValue(undefined);
@@ -268,6 +279,7 @@ describe('runSimulation', () => {
       });
 
       expect(mocks.buildGraph).toHaveBeenCalledWith('mf-proj-001');
+      expect(mocks.fetchGraphData).toHaveBeenCalledWith('graph-001');
     });
 
     it('should create then start simulation with config', async () => {

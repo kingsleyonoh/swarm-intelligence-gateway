@@ -1,9 +1,5 @@
 /**
  * Pre-built scenario templates for quick-launch simulations.
- *
- * Each template contains realistic geopolitical scenario data
- * ready to be inserted into the scenarios table and triggered
- * as a simulation without manual data entry.
  */
 
 import type { Theater, Entity, EventSeed, Constraints } from './types.js';

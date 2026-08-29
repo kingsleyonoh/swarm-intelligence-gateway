@@ -36,6 +36,7 @@ describe('parseRedisUrl', () => {
     expect(result.host).toBe('host.upstash.io');
     expect(result.port).toBe(6379);
     expect(result.password).toBe('token');
+    expect(result.tls).toEqual({});
   });
 
   it('should handle URL with username and password', () => {
@@ -44,6 +45,12 @@ describe('parseRedisUrl', () => {
     expect(result.host).toBe('redis-host');
     expect(result.port).toBe(6381);
     expect(result.password).toBe('pass123');
+  });
+
+  it('should preserve the database index from a Redis URL', () => {
+    const result = parseRedisUrl('redis://localhost:6383/4');
+
+    expect(result.db).toBe(4);
   });
 });
 

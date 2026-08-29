@@ -101,6 +101,25 @@ describe('MirofishClient', () => {
       const callArgs = mocks.request.mock.calls[0];
       expect(callArgs[0]).toBe('http://localhost:5000/api/graph/ontology/generate');
       expect(callArgs[1].method).toBe('POST');
+      expect(callArgs[1].headers).toEqual(
+        expect.objectContaining({ 'accept-language': 'en' }),
+      );
+    });
+
+    it('should send graph-provider constraints as additional context', async () => {
+      mocks.request.mockResolvedValue(mockResponse(200, { project_id: 'proj-constraints' }));
+
+      await client.generateOntology(
+        'seed doc',
+        'requirement',
+        'project',
+        'Keep every edge source_targets list at ten items or fewer.',
+      );
+
+      const form = mocks.request.mock.calls[0][1].body as FormData;
+      expect(form.get('additional_context')).toBe(
+        'Keep every edge source_targets list at ten items or fewer.',
+      );
     });
 
     it('should retry on connection error and succeed on third attempt', async () => {
@@ -231,6 +250,19 @@ describe('MirofishClient', () => {
       await client.pollTask('task-123', 'Test', 60_000);
 
       expect(mocks.request).toHaveBeenCalledTimes(3);
+    });
+
+    it('returns the completed task payload for downstream identifiers', async () => {
+      mocks.request.mockResolvedValue(mockResponse(200, {
+        data: { status: 'completed', result: { graph_id: 'graph-123' } },
+      }));
+
+      const result = await client.pollTask('task-123', 'Graph build', 60_000);
+
+      expect(result).toMatchObject({
+        status: 'completed',
+        result: { graph_id: 'graph-123' },
+      });
     });
 
     it('should throw on error status', async () => {

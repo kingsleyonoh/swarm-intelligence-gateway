@@ -10,11 +10,20 @@ import { env } from '../config/env.js';
  */
 export function parseRedisUrl(url: string): ConnectionOptions {
   const parsed = new URL(url);
+  const database = parsed.pathname.replace(/^\//, '');
+  const db = database === '' ? undefined : Number(database);
+
+  if (db !== undefined && (!Number.isInteger(db) || db < 0)) {
+    throw new Error(`Invalid Redis database index: ${database}`);
+  }
 
   return {
     host: parsed.hostname,
     port: parseInt(parsed.port || '6379', 10),
     password: parsed.password || undefined,
+    username: parsed.username || undefined,
+    db,
+    ...(parsed.protocol === 'rediss:' ? { tls: {} } : {}),
   };
 }
 

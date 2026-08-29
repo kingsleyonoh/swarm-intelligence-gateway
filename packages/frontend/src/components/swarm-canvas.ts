@@ -4,6 +4,13 @@
  * active simulations with a mesmerizing clustering visualization.
  */
 
+import {
+  drawParticles,
+  GRAY,
+  STANCE_COLORS,
+  type Particle,
+} from './swarm-canvas-rendering.js';
+
 export interface SwarmCanvasConfig {
   particleCount: number;
   width: number;
@@ -30,23 +37,6 @@ export interface SwarmCanvasController {
   getDistribution(): StanceDistribution;
   destroy(): void;
 }
-
-interface Particle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  color: string;
-  group: number; // 0=red/escalation, 1=blue, 2=yellow, 3=purple
-}
-
-const STANCE_COLORS = ['#e05252', '#4a90d9', '#d4a843', '#9b59b6'];
-const GRAY = '#444444';
-const BG_COLOR = '#1A1D26';
-const CONNECTION_DIST = 70;
-const CONNECTION_ALPHA = 0.06;
-const PARTICLE_RADIUS = 3;
-const TRAIL_ALPHA = 0.25; // higher = less trail (clears faster)
 
 /** Assign a stance group based on distribution: 40% red, 30% blue, 20% yellow, 10% purple */
 function assignGroup(index: number, total: number): number {
@@ -149,106 +139,6 @@ function softBounds(p: Particle, w: number, h: number): void {
   if (p.x > w - margin) { p.x = w - margin; p.vx = -Math.abs(p.vx) * 0.5; }
   if (p.y < margin) { p.y = margin; p.vy = Math.abs(p.vy) * 0.5; }
   if (p.y > h - margin) { p.y = h - margin; p.vy = -Math.abs(p.vy) * 0.5; }
-}
-
-function drawParticles(
-  ctx: CanvasRenderingContext2D,
-  particles: Particle[],
-  phase: string,
-): void {
-  // Trail effect — semi-transparent background fill creates motion trails
-  ctx.fillStyle = BG_COLOR;
-  ctx.globalAlpha = TRAIL_ALPHA;
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  ctx.globalAlpha = 1;
-
-  // Draw connections (thin lines between nearby particles)
-  if (phase === 'graph_building' || phase === 'simulating') {
-    drawConnections(ctx, particles);
-  }
-
-  // Subtle cluster glow behind particles
-  if (phase === 'simulating' || phase === 'reporting' || phase === 'completed') {
-    drawClusterGlow(ctx, particles);
-  }
-
-  // Draw crisp particles with subtle halo
-  for (const p of particles) {
-    // Subtle halo (small, not blobby)
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, PARTICLE_RADIUS * 2, 0, Math.PI * 2);
-    ctx.fillStyle = p.color;
-    ctx.globalAlpha = 0.04;
-    ctx.fill();
-
-    // Crisp core dot
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, PARTICLE_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = p.color;
-    ctx.globalAlpha = 0.85;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-}
-
-function drawConnections(
-  ctx: CanvasRenderingContext2D,
-  particles: Particle[],
-): void {
-  ctx.lineWidth = 0.5;
-  for (let i = 0; i < particles.length; i++) {
-    for (let j = i + 1; j < particles.length; j++) {
-      const a = particles[i];
-      const b = particles[j];
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < CONNECTION_DIST) {
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.strokeStyle = a.color;
-        ctx.globalAlpha = CONNECTION_ALPHA;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-    }
-  }
-}
-
-function drawClusterGlow(
-  ctx: CanvasRenderingContext2D,
-  particles: Particle[],
-): void {
-  // Find center of mass of EACH group and draw glow
-  const counts = [0, 0, 0, 0];
-  const cx = [0, 0, 0, 0];
-  const cy = [0, 0, 0, 0];
-  for (const p of particles) {
-    counts[p.group]++;
-    cx[p.group] += p.x;
-    cy[p.group] += p.y;
-  }
-
-  for (let g = 0; g < 4; g++) {
-    if (counts[g] < 5) continue;
-    const centerX = cx[g] / counts[g];
-    const centerY = cy[g] / counts[g];
-    const radius = 20 + counts[g] * 0.5;
-
-    // Subtle radial gradient glow behind cluster
-    const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-    grad.addColorStop(0, STANCE_COLORS[g]);
-    grad.addColorStop(1, 'transparent');
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    ctx.fillStyle = grad;
-    ctx.globalAlpha = 0.06;
-    ctx.fill();
-    ctx.restore();
-  }
 }
 
 export function createSwarmCanvas(

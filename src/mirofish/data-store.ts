@@ -6,10 +6,14 @@
  * after simulation phases complete.
  */
 
-import { agentEpisodes, agentProfiles, predictions } from '../db/schema/tables.js';
+import crypto from 'node:crypto';
+
+import { sql } from 'drizzle-orm';
+import { agentProfiles, predictions } from '../db/schema/tables.js';
 import { db } from '../shared/db.js';
 import { invalidatePattern } from '../shared/cache.js';
 import { createChildLogger } from '../shared/logger.js';
+import { addEpisode } from '../memory/graph-store.js';
 
 import type { ParsedPrediction } from './prediction-parser.js';
 import type { ActionLogEntry, MirofishAgentProfile } from './types.js';
@@ -33,17 +37,31 @@ export async function storeActionLogs(
 
   if (agentActions.length === 0) return;
 
-  const rows = agentActions.map((action) => ({
-    tenantId,
-    simulationId,
-    agentId: action.agent_id,
-    roundNumber: action.round ?? 0,
-    actionType: action.action_type,
-    content: action.content ?? '',
-    metadata: action.metadata ?? {},
+  await Promise.all(agentActions.map((action) => {
+    const content = action.action_args?.content ?? action.content ?? action.action_type;
+    const sourceKey = crypto.createHash('sha256').update(JSON.stringify({
+      agentId: action.agent_id,
+      round: action.round ?? 0,
+      platform: action.platform ?? 'twitter',
+      actionType: action.action_type,
+      content,
+      timestamp: action.timestamp ?? '',
+    })).digest('hex');
+    return addEpisode({
+      tenantId,
+      simulationId,
+      agentId: action.agent_id,
+      roundNumber: action.round ?? 0,
+      actionType: action.action_type,
+      content: content.trim() || action.action_type,
+      sourceKey,
+      metadata: {
+        ...(action.metadata ?? {}),
+        ...(action.agent_name ? { agent_name: action.agent_name } : {}),
+        platform: action.platform ?? 'twitter',
+      },
+    });
   }));
-
-  await db.insert(agentEpisodes).values(rows);
 }
 
 /**
@@ -66,11 +84,33 @@ export async function storeProfiles(
     bio: profile.bio ?? '',
     persona: profile.persona ?? '',
     entityClass: profile.profession ?? '',
-    stance: 'neutral',
+    stance: inferStance(profile),
     influenceWeight: '0.5',
   }));
 
-  await db.insert(agentProfiles).values(rows);
+  await db
+    .insert(agentProfiles)
+    .values(rows)
+    .onConflictDoUpdate({
+      target: [agentProfiles.simulationId, agentProfiles.agentId],
+      set: {
+        username: sql`excluded.username`,
+        name: sql`excluded.name`,
+        bio: sql`excluded.bio`,
+        persona: sql`excluded.persona`,
+        entityClass: sql`excluded.entity_class`,
+        stance: sql`excluded.stance`,
+        influenceWeight: sql`excluded.influence_weight`,
+      },
+    });
+}
+
+function inferStance(profile: MirofishAgentProfile): string | null {
+  if (profile.stance?.trim()) return profile.stance.trim();
+  const text = `${profile.bio ?? ''} ${profile.persona ?? ''}`.toLowerCase();
+  if (/de[- ]?escalat|reconciliat|peaceful|diplomatic/.test(text)) return 'de_escalate';
+  if (/escalat|aggress|hawkish|militant|confront/.test(text)) return 'escalate';
+  return null;
 }
 
 /**

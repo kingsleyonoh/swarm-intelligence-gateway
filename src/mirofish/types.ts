@@ -34,6 +34,7 @@ export interface BuildResponse {
 export interface TaskStatusResponse {
   status: 'pending' | 'processing' | 'complete' | 'completed' | 'error' | 'failed';
   error?: string;
+  result?: { graph_id?: string; [key: string]: unknown };
   [key: string]: unknown;
 }
 
@@ -60,6 +61,8 @@ export interface SimulationStartResponse {
 export interface SimulationStatusResponse {
   status: 'running' | 'complete' | 'completed' | 'error' | 'failed' | string;
   progress?: number;
+  runner_status?: string;
+  progress_percent?: number;
   error?: string;
 }
 
@@ -79,11 +82,13 @@ export interface SimulationReportResponse {
  */
 export interface ActionLogEntry {
   agent_id: number;
+  agent_name?: string;
   round: number;
   platform: string;
   action_type: string;
   content: string;
-  timestamp: string;
+  action_args?: { content?: string; [key: string]: unknown };
+  timestamp?: string;
   metadata: Record<string, unknown>;
 }
 
@@ -104,6 +109,37 @@ export interface MirofishAgentProfile {
   persona?: string;
   profession?: string;
   country?: string;
+  stance?: string;
+  [key: string]: unknown;
+}
+
+/** Graph node returned by MiroFish's graph data endpoint. */
+export interface MirofishGraphNode {
+  uuid: string;
+  name: string;
+  labels?: string[];
+  summary?: string;
+  attributes?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** Graph edge returned by MiroFish's graph data endpoint. */
+export interface MirofishGraphEdge {
+  uuid: string;
+  name: string;
+  fact?: string;
+  fact_type?: string;
+  source_node_uuid: string;
+  target_node_uuid: string;
+  attributes?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** Normalized graph data used to populate the gateway's own graph store. */
+export interface MirofishGraphData {
+  graphId: string;
+  nodes: MirofishGraphNode[];
+  edges: MirofishGraphEdge[];
 }
 
 // ── Client Configuration ────────────────────────────────────────────────

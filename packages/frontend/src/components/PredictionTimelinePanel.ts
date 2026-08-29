@@ -12,8 +12,10 @@ import type {
   PredictionPoint,
   PredictionTimelineData,
 } from './prediction-types.js';
-import { PREDICTION_TYPE_COLORS } from './prediction-types.js';
-import type { PredictionType } from '../types.js';
+import {
+  renderDots,
+  renderTheaterLines,
+} from './prediction-timeline-rendering.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -23,7 +25,6 @@ const CHART_HEIGHT = 400;
 const MARGIN = { top: 20, right: 20, bottom: 40, left: 50 };
 const PLOT_W = CHART_WIDTH - MARGIN.left - MARGIN.right;
 const PLOT_H = CHART_HEIGHT - MARGIN.top - MARGIN.bottom;
-const DOT_RADIUS = 8;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class PredictionTimelinePanel implements Panel {
@@ -109,8 +110,20 @@ export class PredictionTimelinePanel implements Panel {
 
     this.removeEmpty();
     this.renderDateTicks();
-    this.renderTheaterLines();
-    this.renderDots();
+    renderTheaterLines(
+      this.plotGroup,
+      this.points,
+      (timestamp) => this.scaleX(String(timestamp)),
+      (confidence) => this.scaleY(Number(confidence)),
+    );
+    renderDots(
+      this.plotGroup,
+      this.points,
+      (timestamp) => this.scaleX(String(timestamp)),
+      (confidence) => this.scaleY(Number(confidence)),
+      (point, event) => this.showTooltip(point, event),
+      () => this.hideTooltip(),
+    );
   }
 
   private renderAxes(): void {
@@ -240,83 +253,6 @@ export class PredictionTimelinePanel implements Panel {
     return PLOT_H - confidence * PLOT_H;
   }
 
-  private renderTheaterLines(): void {
-    if (!this.plotGroup) return;
-
-    // Group points by theater, sorted by time
-    const grouped = new Map<string, PredictionPoint[]>();
-    for (const p of this.points) {
-      const list = grouped.get(p.theater) ?? [];
-      list.push(p);
-      grouped.set(p.theater, list);
-    }
-
-    for (const [, theaterPoints] of grouped) {
-      if (theaterPoints.length < 2) continue;
-
-      const sorted = [...theaterPoints].sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() -
-          new Date(b.createdAt).getTime(),
-      );
-
-      for (let i = 0; i < sorted.length - 1; i++) {
-        const line = document.createElementNS(SVG_NS, 'line');
-        line.setAttribute('class', 'theater-line');
-        line.setAttribute('x1', String(this.scaleX(sorted[i].createdAt)));
-        line.setAttribute('y1', String(this.scaleY(sorted[i].confidence)));
-        line.setAttribute(
-          'x2',
-          String(this.scaleX(sorted[i + 1].createdAt)),
-        );
-        line.setAttribute(
-          'y2',
-          String(this.scaleY(sorted[i + 1].confidence)),
-        );
-        line.setAttribute('stroke', 'rgba(255,255,255,0.4)');
-        line.setAttribute('stroke-width', '1.5');
-        this.plotGroup.appendChild(line);
-      }
-    }
-  }
-
-  private renderDots(): void {
-    if (!this.plotGroup) return;
-
-    // Build jitter offsets for dots sharing the same timestamp
-    const tsCounts = new Map<string, number>();
-    const tsIndex = new Map<string, number>();
-    for (const p of this.points) {
-      tsCounts.set(p.createdAt, (tsCounts.get(p.createdAt) ?? 0) + 1);
-    }
-
-    for (const point of this.points) {
-      const idx = tsIndex.get(point.createdAt) ?? 0;
-      tsIndex.set(point.createdAt, idx + 1);
-      const total = tsCounts.get(point.createdAt) ?? 1;
-      const jitter = total > 1 ? (idx - (total - 1) / 2) * 10 : 0;
-      const cx = this.scaleX(point.createdAt) + jitter;
-      const cy = this.scaleY(point.confidence);
-      const color =
-        PREDICTION_TYPE_COLORS[point.predictionType as PredictionType] ??
-        '#888';
-
-      const circle = document.createElementNS(SVG_NS, 'circle');
-      circle.setAttribute('class', 'prediction-dot');
-      circle.setAttribute('cx', String(cx));
-      circle.setAttribute('cy', String(cy));
-      circle.setAttribute('r', String(DOT_RADIUS));
-      circle.setAttribute('fill', color);
-      circle.setAttribute('data-prediction-id', point.id);
-
-      circle.addEventListener('mouseenter', (e) =>
-        this.showTooltip(point, e as MouseEvent),
-      );
-      circle.addEventListener('mouseleave', () => this.hideTooltip());
-
-      this.plotGroup.appendChild(circle);
-    }
-  }
 
   private showTooltip(point: PredictionPoint, event: MouseEvent): void {
     if (!this.tooltipEl || !this.container) return;
@@ -331,12 +267,18 @@ export class PredictionTimelinePanel implements Panel {
       : event.offsetX + 12;
     this.tooltipEl.style.left = `${Math.max(0, x)}px`;
     this.tooltipEl.style.top = `${event.offsetY - 8}px`;
-    this.tooltipEl.innerHTML = [
-      `<strong>${point.theater}</strong>`,
+    this.tooltipEl.replaceChildren();
+    const heading = document.createElement('strong');
+    heading.textContent = point.theater;
+    this.tooltipEl.appendChild(heading);
+    for (const line of [
       summary,
       `Confidence: ${Math.round(point.confidence * 100)}%`,
       `Horizon: ${point.timeHorizon}`,
-    ].join('<br>');
+    ]) {
+      this.tooltipEl.appendChild(document.createElement('br'));
+      this.tooltipEl.appendChild(document.createTextNode(line));
+    }
   }
 
   private hideTooltip(): void {

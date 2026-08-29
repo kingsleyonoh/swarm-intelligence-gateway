@@ -69,7 +69,7 @@ describe('startPollerCron', () => {
 
     expect(mocks.cronSchedule).toHaveBeenCalledTimes(1);
     expect(mocks.cronSchedule).toHaveBeenCalledWith(
-      '*/60 * * * *',
+      '0 * * * *',
       expect.any(Function),
     );
   });

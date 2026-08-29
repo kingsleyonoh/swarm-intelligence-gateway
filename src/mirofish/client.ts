@@ -1,488 +1,156 @@
-/**
- * MiroFish HTTP Client.
- *
- * Communicates with the MiroFish Flask API to drive ontology generation,
- * graph building, simulation execution, and report retrieval.
- *
- * Retry logic: connection errors (ECONNREFUSED, ETIMEDOUT) trigger
- * exponential backoff retries (1s, 2s, 4s). HTTP errors (4xx, 5xx)
- * are not retried — they indicate application-level failures.
- */
+import { FormData } from 'undici';
 
-import { request, FormData } from 'undici';
+import { env } from '../config/env.js';
 
-import { createChildLogger } from '../shared/logger.js';
+import { MirofishDataClient } from './data-client.js';
+import { requestWithRetry, type HttpRetryOptions, type MirofishRequestOptions } from './http.js';
+import { MirofishPoller } from './polling.js';
 
 import type {
   ActionLogEntry,
   BuildResponse,
   MirofishAgentProfile,
   MirofishConfig,
+  MirofishGraphData,
   OntologyGenerateResponse,
-  TaskStatusResponse,
   SimulationCreateResponse,
   SimulationReportResponse,
   SimulationStartResponse,
-  SimulationStatusResponse,
+  TaskStatusResponse,
 } from './types.js';
 
-const log = createChildLogger({ module: 'mirofish-client' });
-
-// ── Retry Helpers ─────────────────────────────────────────────────────
-
-/** Error codes that indicate a connection-level failure worth retrying. */
-const RETRYABLE_CODES = new Set(['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNRESET']);
-
-/** Check whether an error is a retryable connection failure. */
-function isRetryableError(err: unknown): boolean {
-  if (err instanceof Error) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code && RETRYABLE_CODES.has(code)) return true;
-  }
-  return false;
-}
-
-/** Sleep for a given number of milliseconds. */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// ── Client Configuration ─────────────────────────────────────────────
-
-export interface MirofishClientOptions {
-  /** Maximum retry attempts for connection errors (default: 3). */
-  maxRetries?: number;
-  /** Base delay in ms for exponential backoff (default: 1000). */
-  retryBaseDelayMs?: number;
-  /** Poll interval for ontology status in ms (default: 5000). */
+export interface MirofishClientOptions extends Partial<HttpRetryOptions> {
   ontologyPollIntervalMs?: number;
-  /** Poll interval for simulation status in ms (default: 10000). */
   simulationPollIntervalMs?: number;
 }
 
-// ── Client Class ──────────────────────────────────────────────────────
-
+/** Deep adapter for the MiroFish HTTP workflow. */
 export class MirofishClient {
-  private readonly maxRetries: number;
-  private readonly retryBaseDelayMs: number;
-  private readonly ontologyPollIntervalMs: number;
-  private readonly simulationPollIntervalMs: number;
+  private readonly retry: HttpRetryOptions;
+  private readonly poller: MirofishPoller;
+  private readonly data: MirofishDataClient;
 
   constructor(
     private readonly baseUrl: string,
     options: MirofishClientOptions = {},
   ) {
-    this.maxRetries = options.maxRetries ?? 3;
-    this.retryBaseDelayMs = options.retryBaseDelayMs ?? 1000;
-    this.ontologyPollIntervalMs = options.ontologyPollIntervalMs ?? 5000;
-    this.simulationPollIntervalMs = options.simulationPollIntervalMs ?? 10_000;
+    this.retry = {
+      maxRetries: options.maxRetries ?? 3,
+      retryBaseDelayMs: options.retryBaseDelayMs ?? 1000,
+    };
+    const adapter = { request: this.request.bind(this) };
+    this.poller = new MirofishPoller(adapter, {
+      taskMs: options.ontologyPollIntervalMs ?? 5000,
+      simulationMs: options.simulationPollIntervalMs ?? 10_000,
+    });
+    this.data = new MirofishDataClient(adapter, baseUrl);
   }
 
-  // ── Public API ────────────────────────────────────────────────────
-
-  /**
-   * Upload seed document and generate ontology.
-   *
-   * `POST /api/graph/ontology/generate` — multipart/form-data with seed
-   * document file, simulation requirement text, and project name.
-   */
   async generateOntology(
     seedDocument: string,
-    simulationRequirement: string,
+    requirement: string,
     projectName: string,
+    additionalContext?: string,
   ): Promise<OntologyGenerateResponse> {
-    const formData = new FormData();
-    const blob = new Blob([seedDocument], { type: 'text/markdown' });
-    formData.append('files', blob, 'seed_document.md');
-    formData.append('simulation_requirement', simulationRequirement);
-    formData.append('project_name', projectName);
-
-    return this.requestWithRetry<OntologyGenerateResponse>(
-      `${this.baseUrl}/api/graph/ontology/generate`,
-      { method: 'POST', body: formData },
-    );
+    const form = new FormData();
+    form.append('files', new Blob([seedDocument], { type: 'text/markdown' }), 'seed_document.md');
+    form.append('simulation_requirement', requirement);
+    form.append('project_name', projectName);
+    if (additionalContext) form.append('additional_context', additionalContext);
+    return this.request('/api/graph/ontology/generate', { method: 'POST', body: form });
   }
 
-  /**
-   * Poll a MiroFish async task until complete or timeout.
-   *
-   * `GET /api/graph/task/:taskId` — polls every 5 seconds.
-   * Used after buildGraph (and any other async operation).
-   *
-   * @param taskId - MiroFish task ID
-   * @param label - Human-readable label for log messages (e.g. "Graph build")
-   * @param timeoutMs - Maximum wait time (default 10 minutes)
-   */
-  async pollTask(
-    taskId: string,
-    label: string = 'Task',
-    timeoutMs: number = 600_000,
-  ): Promise<void> {
-    const deadline = Date.now() + timeoutMs;
-
-    while (Date.now() < deadline) {
-      const response = await this.requestWithRetry<Record<string, unknown>>(
-        `${this.baseUrl}/api/graph/task/${taskId}`,
-        { method: 'GET' },
-      );
-
-      // MiroFish wraps task status under `data`: { data: { status }, success }
-      const taskData = (response.data ?? response) as TaskStatusResponse;
-      const taskStatus = taskData.status;
-
-      if (taskStatus === 'complete' || taskStatus === 'completed') {
-        log.info({ taskId, label }, `${label} complete`);
-        return;
-      }
-
-      if (taskStatus === 'error' || taskStatus === 'failed') {
-        throw new Error(
-          `${label} failed: ${taskData.error ?? 'unknown error'}`,
-        );
-      }
-
-      log.debug({ taskId, label, status: taskStatus }, `${label} still processing`);
-      await sleep(this.ontologyPollIntervalMs);
-    }
-
-    throw new Error(
-      `${label} timed out after ${timeoutMs}ms for task ${taskId}`,
-    );
+  buildGraph(projectId: string): Promise<BuildResponse> {
+    return this.json('/api/graph/build', { project_id: projectId });
   }
 
-  /**
-   * Build the knowledge graph from the generated ontology.
-   *
-   * `POST /api/graph/build` — JSON `{ project_id }`.
-   */
-  async buildGraph(projectId: string): Promise<BuildResponse> {
-    return this.requestWithRetry<BuildResponse>(
-      `${this.baseUrl}/api/graph/build`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId }),
-      },
-    );
+  createSimulation(projectId: string): Promise<SimulationCreateResponse> {
+    return this.json('/api/simulation/create', { project_id: projectId });
   }
 
-  /**
-   * Create a simulation from a project.
-   *
-   * `POST /api/simulation/create` — JSON `{ project_id }`.
-   * Must be called before `startSimulation`.
-   */
-  async createSimulation(
-    projectId: string,
-  ): Promise<SimulationCreateResponse> {
-    return this.requestWithRetry<SimulationCreateResponse>(
-      `${this.baseUrl}/api/simulation/create`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId }),
-      },
-    );
+  prepareSimulation(simulationId: string): Promise<Record<string, unknown>> {
+    return this.json('/api/simulation/prepare', { simulation_id: simulationId });
   }
 
-  /**
-   * Prepare a simulation (generate profiles + config).
-   *
-   * `POST /api/simulation/prepare` — JSON `{ simulation_id }`.
-   * Async — poll via `POST /api/simulation/prepare/status`.
-   */
-  async prepareSimulation(
-    simulationId: string,
-  ): Promise<Record<string, unknown>> {
-    return this.requestWithRetry<Record<string, unknown>>(
-      `${this.baseUrl}/api/simulation/prepare`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ simulation_id: simulationId }),
-      },
-    );
+  startSimulation(simulationId: string, config: MirofishConfig): Promise<SimulationStartResponse> {
+    return this.json('/api/simulation/start', {
+      simulation_id: simulationId,
+      agent_count: config.agentCount,
+      round_count: config.roundCount,
+    });
   }
 
-  /**
-   * Poll simulation preparation status until ready.
-   *
-   * `POST /api/simulation/prepare/status` — JSON `{ simulation_id }`.
-   */
-  async pollPrepareStatus(
-    simulationId: string,
-    timeoutMs: number = 600_000,
-  ): Promise<void> {
-    const deadline = Date.now() + timeoutMs;
-
-    while (Date.now() < deadline) {
-      const response = await this.requestWithRetry<Record<string, unknown>>(
-        `${this.baseUrl}/api/simulation/prepare/status`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ simulation_id: simulationId }),
-        },
-      );
-
-      const data = (response.data ?? response) as Record<string, unknown>;
-      const ready = data.all_ready === true || data.status === 'ready' || data.status === 'completed';
-
-      if (ready) {
-        log.info({ simulationId }, 'Simulation preparation complete');
-        return;
-      }
-
-      log.debug({ simulationId, data }, 'Simulation still preparing');
-      await sleep(this.ontologyPollIntervalMs);
-    }
-
-    throw new Error(
-      `Simulation preparation timed out after ${timeoutMs}ms`,
-    );
+  generateReport(simulationId: string): Promise<Record<string, unknown>> {
+    return this.json('/api/report/generate', { simulation_id: simulationId });
   }
 
-  /**
-   * Start a previously created and prepared simulation.
-   *
-   * `POST /api/simulation/start` — JSON `{ simulation_id, ... }`.
-   */
-  async startSimulation(
-    simulationId: string,
-    config: MirofishConfig,
-  ): Promise<SimulationStartResponse> {
-    return this.requestWithRetry<SimulationStartResponse>(
-      `${this.baseUrl}/api/simulation/start`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          simulation_id: simulationId,
-          agent_count: config.agentCount,
-          round_count: config.roundCount,
-        }),
-      },
-    );
-  }
-
-  /**
-   * Poll simulation status until complete or timeout.
-   *
-   * `GET /api/simulation/:simId/run-status` — polls every 10 seconds.
-   *
-   * @param simId - MiroFish simulation ID
-   * @param timeoutMs - Maximum wait time (default 30 minutes)
-   */
-  async pollSimulationStatus(
-    simId: string,
-    timeoutMs: number = 1_800_000,
-  ): Promise<void> {
-    const deadline = Date.now() + timeoutMs;
-
-    while (Date.now() < deadline) {
-      const response = await this.requestWithRetry<Record<string, unknown>>(
-        `${this.baseUrl}/api/simulation/${simId}/run-status`,
-        { method: 'GET' },
-      );
-
-      // MiroFish wraps under `data` and uses `runner_status` for completion
-      const simData = (response.data ?? response) as Record<string, unknown>;
-      const runnerStatus = simData.runner_status as string ?? simData.status as string ?? '';
-      const progress = simData.progress_percent as number ?? simData.progress as number ?? 0;
-
-      if (runnerStatus === 'complete' || runnerStatus === 'completed') {
-        log.info({ simId, progress }, 'Simulation complete');
-        return;
-      }
-
-      if (runnerStatus === 'error' || runnerStatus === 'failed') {
-        throw new Error(
-          `Simulation failed: ${(simData.error as string) ?? 'unknown error'}`,
-        );
-      }
-
-      log.debug({ simId, status: runnerStatus, progress }, 'Simulation running');
-      await sleep(this.simulationPollIntervalMs);
-    }
-
-    throw new Error(
-      `Simulation timed out after ${timeoutMs}ms for simulation ${simId}`,
-    );
-  }
-
-  /**
-   * Generate simulation report (async — must be triggered after simulation completes).
-   *
-   * `POST /api/report/generate` — JSON `{ simulation_id }`.
-   * Returns a task/report ID for polling.
-   */
-  async generateReport(simulationId: string): Promise<Record<string, unknown>> {
-    return this.requestWithRetry<Record<string, unknown>>(
-      `${this.baseUrl}/api/report/generate`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ simulation_id: simulationId }),
-      },
-    );
-  }
-
-  /**
-   * Poll report generation progress until complete.
-   *
-   * `POST /api/report/generate/status` — JSON `{ task_id }`.
-   * Note: This endpoint requires the task_id from generateReport(), NOT simulation_id.
-   */
-  async pollReportStatus(
-    taskId: string,
-    timeoutMs: number = 600_000,
-  ): Promise<void> {
-    const deadline = Date.now() + timeoutMs;
-
-    while (Date.now() < deadline) {
-      const response = await this.requestWithRetry<Record<string, unknown>>(
-        `${this.baseUrl}/api/report/generate/status`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ task_id: taskId }),
-        },
-      );
-
-      const data = (response.data ?? response) as Record<string, unknown>;
-      const status = data.status as string ?? '';
-
-      if (status === 'completed' || status === 'complete' || data.report_id) {
-        log.info({ taskId }, 'Report generation complete');
-        return;
-      }
-
-      if (status === 'error' || status === 'failed') {
-        throw new Error(`Report generation failed: ${(data.error as string) ?? 'unknown'}`);
-      }
-
-      log.debug({ taskId, status }, 'Report still generating');
-      await sleep(this.ontologyPollIntervalMs);
-    }
-
-    throw new Error(`Report generation timed out after ${timeoutMs}ms`);
-  }
-
-  /**
-   * Retrieve the generated simulation report.
-   *
-   * `GET /api/report/by-simulation/:simulationId`
-   */
   async getReport(simulationId: string): Promise<SimulationReportResponse> {
-    const response = await this.requestWithRetry<Record<string, unknown>>(
-      `${this.baseUrl}/api/report/by-simulation/${simulationId}`,
+    const response = await this.request<Record<string, unknown>>(
+      `/api/report/by-simulation/${simulationId}`,
       { method: 'GET' },
     );
-
-    // Extract report text — MiroFish uses `markdown_content` field
-    const data = (response.data ?? response) as Record<string, unknown>;
-    const report = (data.markdown_content as string) ?? (data.content as string) ?? (data.report as string) ?? JSON.stringify(data);
+    const data = unwrap(response);
+    const report = typeof data.markdown_content === 'string' ? data.markdown_content
+      : typeof data.content === 'string' ? data.content
+      : typeof data.report === 'string' ? data.report
+      : JSON.stringify(data);
     return { report };
   }
 
-  /**
-   * Fetch action logs for a completed simulation.
-   *
-   * `GET /api/simulation/:simId/actions` — returns agent action entries.
-   * MiroFish stores action logs as JSONL files; the API endpoint may
-   * return empty if file-serving is not wired up yet. Returns an empty
-   * array in that case (non-fatal).
-   */
-  async fetchActionLog(simId: string): Promise<ActionLogEntry[]> {
-    const res = await this.requestWithRetry<Record<string, unknown>>(
-      `${this.baseUrl}/api/simulation/${simId}/actions`,
-      { method: 'GET' },
-    );
-
-    const data = (res.data ?? res) as Record<string, unknown>;
-    const actions = data.actions as ActionLogEntry[] | undefined;
-
-    if (actions && actions.length > 0) {
-      return actions;
-    }
-
-    log.warn({ simId }, 'Action log API returned empty — agent episodes not available via API');
-    return [];
+  pollTask(taskId: string, label = 'Task', timeoutMs = 600_000): Promise<TaskStatusResponse> {
+    return this.poller.task(taskId, label, timeoutMs);
   }
 
-  /**
-   * Fetch agent profiles for a simulation after the prepare phase.
-   *
-   * `GET /api/simulation/:simId/profiles` — returns generated agent profiles.
-   * MiroFish stores profiles as JSON files; the API endpoint may not exist
-   * yet. Returns an empty array gracefully on any failure.
-   */
-  async fetchProfiles(simId: string): Promise<MirofishAgentProfile[]> {
-    try {
-      const res = await this.requestWithRetry<Record<string, unknown>>(
-        `${this.baseUrl}/api/simulation/${simId}/profiles`,
-        { method: 'GET' },
-      );
-
-      const data = (res.data ?? res) as Record<string, unknown>;
-      const profiles = data.profiles as MirofishAgentProfile[] | undefined;
-
-      if (profiles && profiles.length > 0) {
-        return profiles;
-      }
-    } catch {
-      // API may not support this endpoint yet — non-fatal
-    }
-
-    log.warn({ simId }, 'Agent profiles not available via API');
-    return [];
+  pollPrepareStatus(simulationId: string, timeoutMs = 600_000): Promise<void> {
+    return this.poller.preparation(simulationId, timeoutMs);
   }
 
-  // ── Private Helpers ───────────────────────────────────────────────
-
-  /**
-   * Execute an HTTP request with retry logic for connection errors.
-   *
-   * Retries up to `maxRetries` times with exponential backoff (1s, 2s, 4s).
-   * Only retries on connection-level errors (ECONNREFUSED, ETIMEDOUT, etc.).
-   * HTTP status errors (4xx, 5xx) are thrown immediately.
-   */
-  private async requestWithRetry<T>(
-    url: string,
-    options: Parameters<typeof request>[1],
-  ): Promise<T> {
-    let lastError: Error | undefined;
-
-    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
-      try {
-        const response = await request(url, options);
-
-        if (response.statusCode >= 400) {
-          const bodyText = await response.body.text();
-          throw new Error(
-            `MiroFish API error: ${response.statusCode} — ${bodyText}`,
-          );
-        }
-
-        return (await response.body.json()) as T;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-
-        if (isRetryableError(error) && attempt < this.maxRetries - 1) {
-          const delayMs = this.retryBaseDelayMs * Math.pow(2, attempt);
-          log.warn(
-            { url, attempt: attempt + 1, maxRetries: this.maxRetries, delayMs },
-            'Retrying after connection error',
-          );
-          await sleep(delayMs);
-          lastError = error;
-          continue;
-        }
-
-        throw error;
-      }
-    }
-
-    throw lastError ?? new Error('Request failed after all retries');
+  pollSimulationStatus(simulationId: string, timeoutMs = 1_800_000): Promise<void> {
+    return this.poller.simulation(simulationId, timeoutMs);
   }
+
+  pollReportStatus(taskId: string, timeoutMs = 600_000): Promise<void> {
+    return this.poller.report(taskId, timeoutMs);
+  }
+
+  fetchActionLog(simulationId: string): Promise<ActionLogEntry[]> {
+    return this.data.fetchActionLog(simulationId);
+  }
+
+  fetchProfiles(simulationId: string): Promise<MirofishAgentProfile[]> {
+    return this.data.fetchProfiles(simulationId);
+  }
+
+  fetchGraphData(projectId: string): Promise<MirofishGraphData> {
+    return this.data.fetchGraphData(projectId);
+  }
+
+  private request<T>(path: string, options: MirofishRequestOptions): Promise<T> {
+    return requestWithRetry<T>(`${this.baseUrl}${path}`, {
+      ...options,
+      headers: {
+        'accept-language': 'en',
+        ...(options.headers as Record<string, string> | undefined),
+      },
+    }, this.retry);
+  }
+
+  private json<T>(path: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+}
+
+function unwrap(response: Record<string, unknown>): Record<string, unknown> {
+  const data = response.data;
+  return data !== null && typeof data === 'object' && !Array.isArray(data)
+    ? data as Record<string, unknown>
+    : response;
+}
+
+export function createConfiguredMirofishClient(options?: MirofishClientOptions): MirofishClient {
+  return new MirofishClient(env.MIROFISH_API_URL ?? 'http://127.0.0.1:5000', options);
 }

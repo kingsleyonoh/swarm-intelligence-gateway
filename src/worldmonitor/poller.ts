@@ -17,8 +17,10 @@ import { SCENARIO_SOURCE } from '../config/constants.js';
 import { db } from '../shared/db.js';
 import { createChildLogger } from '../shared/logger.js';
 import { simulationQueue } from '../shared/queue.js';
+import { worldMonitorFailureTracker } from '../ecosystem/failure-tracker.js';
 import { scenarios } from '../db/schema.js';
 
+import { resolveSimulationPackage } from './package-reader.js';
 import { parseSimPackage } from './parser.js';
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -75,6 +77,7 @@ export async function pollWorldMonitor(tenantId: string): Promise<PollResult> {
 
     if (!raw) {
       log.info('WorldMonitor Redis key missing or empty, skipping poll cycle');
+      worldMonitorFailureTracker.recordSuccess(tenantId);
       return { ingested: false };
     }
 
@@ -82,10 +85,13 @@ export async function pollWorldMonitor(tenantId: string): Promise<PollResult> {
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
-    } catch {
-      log.warn({ key: REDIS_KEY }, 'WorldMonitor Redis value is not valid JSON');
+    } catch (error) {
+      log.warn({ error: error instanceof Error ? error.message : String(error), key: REDIS_KEY }, 'WorldMonitor Redis value is not valid JSON');
+      worldMonitorFailureTracker.recordSuccess(tenantId);
       return { ingested: false };
     }
+
+    parsed = await resolveSimulationPackage(parsed, worldMonitorR2Config());
 
     // 4. Validate package shape
     let pkg;
@@ -93,6 +99,7 @@ export async function pollWorldMonitor(tenantId: string): Promise<PollResult> {
       pkg = parseSimPackage(parsed);
     } catch (err) {
       log.warn({ err }, 'WorldMonitor package failed validation');
+      worldMonitorFailureTracker.recordSuccess(tenantId);
       return { ingested: false };
     }
 
@@ -109,6 +116,7 @@ export async function pollWorldMonitor(tenantId: string): Promise<PollResult> {
 
     if (existing.length > 0) {
       log.debug({ runId: pkg.runId }, 'Duplicate runId, skipping ingestion');
+      worldMonitorFailureTracker.recordSuccess(tenantId);
       return { ingested: false };
     }
 
@@ -140,6 +148,7 @@ export async function pollWorldMonitor(tenantId: string): Promise<PollResult> {
     });
 
     log.info({ scenarioId }, 'scenario.ingested event emitted to simulation queue');
+    worldMonitorFailureTracker.recordSuccess(tenantId);
 
     return { ingested: true, scenarioId };
   } catch (err) {
@@ -147,15 +156,37 @@ export async function pollWorldMonitor(tenantId: string): Promise<PollResult> {
       { err, tenantId, error: (err as Error).message },
       'WorldMonitor poll failed, will retry next cycle',
     );
+    await worldMonitorFailureTracker.recordFailure(
+      tenantId,
+      err instanceof Error ? err.message : String(err),
+    );
     return { ingested: false };
   } finally {
     // Always clean up the WorldMonitor Redis connection
     if (wmRedis) {
       try {
         await wmRedis.quit();
-      } catch {
-        // Ignore quit errors — connection may already be closed
+      } catch (error) {
+        log.debug(
+          { tenantId, error: error instanceof Error ? error.message : String(error) },
+          'WorldMonitor Redis connection was already closed',
+        );
       }
     }
   }
+}
+
+function worldMonitorR2Config() {
+  if (!env.WORLDMONITOR_R2_ACCOUNT_ID
+    || !env.WORLDMONITOR_R2_BUCKET
+    || !env.WORLDMONITOR_R2_API_TOKEN) {
+    return undefined;
+  }
+
+  return {
+    accountId: env.WORLDMONITOR_R2_ACCOUNT_ID,
+    bucket: env.WORLDMONITOR_R2_BUCKET,
+    apiToken: env.WORLDMONITOR_R2_API_TOKEN,
+    apiBaseUrl: env.WORLDMONITOR_R2_API_BASE_URL,
+  };
 }

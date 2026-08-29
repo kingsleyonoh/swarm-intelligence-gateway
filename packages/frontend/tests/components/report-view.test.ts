@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
  */
 
 // We need to import the reveal functions — they will be exported from report-view.ts
-import { revealElements, revealPredictions } from '../../src/components/report-view.js';
+import { createReportView, revealElements, revealPredictions } from '../../src/components/report-view.js';
 
 describe('revealElements', () => {
   let container: HTMLElement;
@@ -84,5 +84,30 @@ describe('revealPredictions', () => {
     revealPredictions(container);
     // Should not throw
     expect(container.querySelectorAll('.report-reveal-fan').length).toBe(0);
+  });
+});
+
+describe('createReportView — upstream language passthrough', () => {
+  it('renders persisted predictions and report lines regardless of language', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        report: '# Live report\n\n市场溢出风险正在上升。',
+        predictions: [{
+          theater: 'Strait of Hormuz',
+          predictionType: 'market_shift',
+          summary: '市场溢出风险在未来72小时内上升。',
+          confidence: '0.65',
+          timeHorizon: '72h',
+        }],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const view = createReportView('sim-live', 'Strait of Hormuz', 'key', 'http://localhost:3000', () => {});
+    await vi.waitFor(() => expect(view.querySelectorAll('.report-prediction-card')).toHaveLength(1));
+
+    expect(view.textContent).toContain('市场溢出风险');
+    vi.unstubAllGlobals();
   });
 });

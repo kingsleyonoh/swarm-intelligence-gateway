@@ -34,7 +34,7 @@ export interface StanceSummary {
 
 export interface SwarmHeroController {
   /** Switch to live mode with real simulation data */
-  setLive(phase: string, elapsedMs: number, topic?: string, simId?: string): void;
+  setLive(phase: string, elapsedMs: number, topic?: string, simId?: string, agentCount?: number): void;
   /** Update the displayed topic (from intelligence feed or scenario) */
   setTopic(topic: string): void;
   /** Show real stance data from a completed simulation briefly */

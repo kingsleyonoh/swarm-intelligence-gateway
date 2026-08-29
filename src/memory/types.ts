@@ -81,6 +81,8 @@ export interface AgentEpisode {
   embedding?: number[];
   /** Arbitrary structured metadata (target, sentiment, faction, etc.). */
   metadata?: Record<string, unknown>;
+  /** Stable upstream identifier used to make ingestion idempotent. */
+  sourceKey?: string;
 }
 
 /**

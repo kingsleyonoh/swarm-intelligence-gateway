@@ -108,6 +108,7 @@ const mocks = vi.hoisted(() => ({
   generateOntology: vi.fn(),
   pollTask: vi.fn(),
   buildGraph: vi.fn(),
+  fetchGraphData: vi.fn(),
   createSimulation: vi.fn(),
   prepareSimulation: vi.fn(),
   pollPrepareStatus: vi.fn(),
@@ -127,6 +128,7 @@ vi.mock('../../src/mirofish/client.js', () => ({
     generateOntology = mocks.generateOntology;
     pollTask = mocks.pollTask;
     buildGraph = mocks.buildGraph;
+    fetchGraphData = mocks.fetchGraphData;
     createSimulation = mocks.createSimulation;
     prepareSimulation = mocks.prepareSimulation;
     pollPrepareStatus = mocks.pollPrepareStatus;
@@ -216,6 +218,7 @@ function setupMirofishInstantMocks() {
   mocks.generateOntology.mockResolvedValue({ data: { project_id: 'mf-proj-001' }, success: true });
   mocks.pollTask.mockResolvedValue(undefined);
   mocks.buildGraph.mockResolvedValue({ data: { task_id: 'build-task-001', project_id: 'mf-proj-001', message: 'ok' }, success: true });
+  mocks.fetchGraphData.mockResolvedValue({ graph_id: 'mf-proj-001', nodes: [], edges: [] });
   mocks.createSimulation.mockResolvedValue({ data: { simulation_id: 'mf-sim-001', status: 'created' }, success: true });
   mocks.prepareSimulation.mockResolvedValue({ success: true });
   mocks.pollPrepareStatus.mockResolvedValue(undefined);

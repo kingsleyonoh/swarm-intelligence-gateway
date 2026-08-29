@@ -15,6 +15,13 @@
       "when": 1775725496426,
       "tag": "0001_many_tombstone",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787915414703,
+      "tag": "0002_new_brother_voodoo",
+      "breakpoints": true
     }
   ]
 }

@@ -241,16 +241,14 @@ export class FactionMapPanel implements Panel {
     this.tooltipEl.style.top = `${event.offsetY - 8}px`;
 
     // Theater nodes have 'neutral' stance, prediction-type nodes have real stances
+    const lines: string[] = [];
     if (node.stance === 'neutral') {
       // Theater node — show connected prediction types
       const connected = this.simEdges
         .filter((e) => e.source.id === node.id || e.target.id === node.id)
         .map((e) => e.source.id === node.id ? e.target.name : e.source.name);
-      this.tooltipEl.innerHTML = [
-        `<strong>${node.name}</strong>`,
-        `Theater region`,
-        connected.length > 0 ? `Predictions: ${connected.join(', ')}` : '',
-      ].filter(Boolean).join('<br>');
+      lines.push('Theater region');
+      if (connected.length > 0) lines.push(`Predictions: ${connected.join(', ')}`);
     } else {
       // Prediction-type node — show stance and connected theaters
       const stanceLabel = node.stance === 'escalate' ? 'Escalation risk'
@@ -260,11 +258,16 @@ export class FactionMapPanel implements Panel {
         .filter((e) => e.source.id === node.id || e.target.id === node.id)
         .map((e) => e.source.id === node.id ? e.target.name : e.source.name)
         .filter((n) => n !== node.name);
-      this.tooltipEl.innerHTML = [
-        `<strong>${node.name}</strong>`,
-        stanceLabel,
-        connected.length > 0 ? `Theaters: ${connected.join(', ')}` : '',
-      ].filter(Boolean).join('<br>');
+      lines.push(stanceLabel);
+      if (connected.length > 0) lines.push(`Theaters: ${connected.join(', ')}`);
+    }
+    this.tooltipEl.replaceChildren();
+    const heading = document.createElement('strong');
+    heading.textContent = node.name;
+    this.tooltipEl.appendChild(heading);
+    for (const line of lines) {
+      this.tooltipEl.appendChild(document.createElement('br'));
+      this.tooltipEl.appendChild(document.createTextNode(line));
     }
   }
 

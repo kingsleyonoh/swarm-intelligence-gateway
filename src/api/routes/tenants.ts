@@ -7,7 +7,7 @@ import { db } from '../../shared/db.js';
 import { ValidationError, ForbiddenError } from '../../shared/errors.js';
 import { tenants } from '../../db/schema/tables.js';
 import { env } from '../../config/env.js';
-import { authGuard, type RequestTenant } from '../middleware/auth.js';
+import { authGuard, requireTenant } from '../middleware/auth.js';
 
 /** Zod schema for tenant registration request body. */
 const registerBodySchema = z.object({
@@ -61,7 +61,7 @@ export async function tenantRoutes(app: FastifyInstance): Promise<void> {
     '/api/tenants/me',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       return reply.send({
         id: tenant.id,

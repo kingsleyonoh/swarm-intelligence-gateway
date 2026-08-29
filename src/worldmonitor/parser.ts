@@ -55,6 +55,140 @@ const simPackageSchema = z.object({
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+}
+
+function currentPackageShape(raw: UnknownRecord): boolean {
+  const theaters = raw.selectedTheaters;
+  const first = Array.isArray(theaters) ? theaters[0] : undefined;
+  return isRecord(raw.simulationRequirement)
+    || (isRecord(first) && ('candidateStateId' in first || 'dominantRegion' in first));
+}
+
+function normalizeCurrentTheater(theater: UnknownRecord): UnknownRecord {
+  const label = stringValue(theater.label)
+    ?? stringValue(theater.theaterLabel)
+    ?? stringValue(theater.dominantRegion)
+    ?? stringValue(theater.candidateStateId);
+  const region = stringValue(theater.region)
+    ?? stringValue(theater.dominantRegion)
+    ?? (Array.isArray(theater.macroRegions) ? stringValue(theater.macroRegions[0]) : undefined);
+  const score = typeof theater.rankingScore === 'number' && Number.isFinite(theater.rankingScore)
+    ? Math.max(0, Math.min(1, theater.rankingScore))
+    : 0.5;
+
+  return {
+    ...theater,
+    label,
+    region,
+    route: stringValue(theater.route) ?? stringValue(theater.routeFacilityKey),
+    commodity: stringValue(theater.commodity) ?? stringValue(theater.commodityKey),
+    stateKind: stringValue(theater.stateKind) ?? 'unknown',
+    rankingScore: score,
+  };
+}
+
+function normalizeCurrentEntity(entity: UnknownRecord): UnknownRecord {
+  const relationships = Array.isArray(entity.relationships)
+    ? entity.relationships.filter(isRecord).map((relationship) => ({
+      target: stringValue(relationship.target) ?? stringValue(relationship.targetName) ?? 'unknown',
+      type: stringValue(relationship.type) ?? 'RELATED_TO',
+    }))
+    : [];
+
+  return {
+    ...entity,
+    name: stringValue(entity.name) ?? stringValue(entity.entityId),
+    class: stringValue(entity.class) ?? 'entity',
+    stance: stringValue(entity.stance) ?? 'unknown',
+    objectives: stringArray(entity.objectives),
+    constraints: stringArray(entity.constraints),
+    relationships,
+  };
+}
+
+function normalizeCurrentSeed(seed: UnknownRecord): UnknownRecord {
+  const evidenceRefs = stringArray(seed.evidenceRefs);
+  return {
+    ...seed,
+    type: stringValue(seed.type) ?? 'observation',
+    summary: stringValue(seed.summary) ?? evidenceRefs.join('; '),
+    timing: stringValue(seed.timing) ?? 'unknown',
+    strength: typeof seed.strength === 'number' && Number.isFinite(seed.strength)
+      ? Math.max(0, Math.min(1, seed.strength))
+      : 0.5,
+  };
+}
+
+function constraintText(value: unknown): { text: string; hard: boolean } | undefined {
+  if (typeof value === 'string' && value.trim()) return { text: value, hard: false };
+  if (!isRecord(value)) return undefined;
+  const text = stringValue(value.statement) ?? stringValue(value.description);
+  return text ? { text, hard: value.hard === true } : undefined;
+}
+
+function normalizeCurrentConstraints(value: unknown): UnknownRecord {
+  if (!isRecord(value) || Array.isArray(value.hard) || Array.isArray(value.soft)) return value as UnknownRecord;
+
+  const hard: string[] = [];
+  const soft: string[] = [];
+  for (const entries of Object.values(value)) {
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      const parsed = constraintText(entry);
+      if (!parsed) continue;
+      (parsed.hard ? hard : soft).push(parsed.text);
+    }
+  }
+  return { hard, soft };
+}
+
+/** Convert WorldMonitor's current v2 package into the gateway's stable shape. */
+function normalizeCurrentPackage(raw: unknown): unknown {
+  if (!isRecord(raw) || !currentPackageShape(raw)) return raw;
+
+  const theaters = Array.isArray(raw.selectedTheaters)
+    ? raw.selectedTheaters.filter(isRecord).map(normalizeCurrentTheater)
+    : raw.selectedTheaters;
+  const entities = Array.isArray(raw.entities)
+    ? raw.entities.filter(isRecord).map(normalizeCurrentEntity)
+    : raw.entities;
+  const eventSeeds = Array.isArray(raw.eventSeeds)
+    ? raw.eventSeeds.filter(isRecord).map(normalizeCurrentSeed)
+    : raw.eventSeeds;
+  const requirements = isRecord(raw.simulationRequirement)
+    ? Object.values(raw.simulationRequirement).filter((value): value is string => typeof value === 'string')
+    : raw.simulationRequirement;
+  const firstTheater = Array.isArray(theaters) && isRecord(theaters[0]) ? theaters[0].label : undefined;
+  const generatedAt = typeof raw.generatedAt === 'number' ? raw.generatedAt : undefined;
+
+  return {
+    ...raw,
+    timestamp: stringValue(raw.timestamp)
+      ?? (generatedAt !== undefined ? new Date(generatedAt).toISOString() : undefined),
+    title: stringValue(raw.title)
+      ?? (typeof firstTheater === 'string' ? `WorldMonitor simulation: ${firstTheater}` : undefined),
+    selectedTheaters: theaters,
+    entities,
+    eventSeeds,
+    constraints: normalizeCurrentConstraints(raw.constraints),
+    simulationRequirement: Array.isArray(requirements) ? requirements.join('\n\n') : requirements,
+  };
+}
+
 /** Strip HTML tags from a string to prevent XSS in downstream output. */
 function stripHtmlTags(input: string): string {
   return input.replace(/<[^>]*>/g, '');
@@ -112,7 +246,7 @@ function sanitizePackage(pkg: SimPackage): SimPackage {
  * @throws {ValidationError} if the input does not match the expected shape
  */
 export function parseSimPackage(raw: unknown): SimPackage {
-  const result = simPackageSchema.safeParse(raw);
+  const result = simPackageSchema.safeParse(normalizeCurrentPackage(raw));
 
   if (!result.success) {
     throw new ValidationError(

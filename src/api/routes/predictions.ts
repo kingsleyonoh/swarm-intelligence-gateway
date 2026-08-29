@@ -18,7 +18,7 @@
  * persisted — see `src/mirofish/orchestrator.ts`.
  */
 
-import { and, desc, eq, gte, lt } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -28,7 +28,7 @@ import { getOrSet, PREDICTION_CACHE_TTL_SECONDS } from '../../shared/cache.js';
 import { paginationSchema } from '../../shared/validation.js';
 import { predictions } from '../../db/schema/tables.js';
 import { MAX_PAGE_SIZE } from '../../config/constants.js';
-import { authGuard, type RequestTenant } from '../middleware/auth.js';
+import { authGuard, requireTenant } from '../middleware/auth.js';
 
 // ── Query Schemas ───────────────────────────────────────────────────────
 
@@ -89,7 +89,7 @@ export async function predictionRoutes(app: FastifyInstance): Promise<void> {
     '/api/predictions/latest',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const parsed = latestPredictionsSchema.safeParse(request.query);
       if (!parsed.success) {
@@ -130,7 +130,7 @@ export async function predictionRoutes(app: FastifyInstance): Promise<void> {
     '/api/predictions',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const parsed = listPredictionsSchema.safeParse(request.query);
       if (!parsed.success) {
@@ -160,12 +160,19 @@ export async function predictionRoutes(app: FastifyInstance): Promise<void> {
 
         if (cursor) {
           const [cursorRow] = await db
-            .select({ createdAt: predictions.createdAt })
+            .select({ id: predictions.id, createdAt: predictions.createdAt })
             .from(predictions)
-            .where(eq(predictions.id, cursor));
+            .where(and(eq(predictions.id, cursor), eq(predictions.tenantId, tenant.id)));
 
           if (cursorRow) {
-            conditions.push(lt(predictions.createdAt, cursorRow.createdAt));
+            const cursorCondition = or(
+              lt(predictions.createdAt, cursorRow.createdAt),
+              and(
+                eq(predictions.createdAt, cursorRow.createdAt),
+                lt(predictions.id, cursorRow.id),
+              ),
+            );
+            if (cursorCondition) conditions.push(cursorCondition);
           }
         }
 
@@ -173,7 +180,7 @@ export async function predictionRoutes(app: FastifyInstance): Promise<void> {
           .select(PREDICTION_COLUMNS)
           .from(predictions)
           .where(and(...conditions))
-          .orderBy(desc(predictions.createdAt))
+          .orderBy(desc(predictions.createdAt), desc(predictions.id))
           .limit(limit + 1);
 
         const hasMore = rows.length > limit;

@@ -144,6 +144,12 @@ export const graphEdges = pgTable(
   (table) => [
     index('idx_graph_edges_tenant_sim').on(table.tenantId, table.simulationId),
     index('idx_graph_edges_source').on(table.sourceNodeId),
+    unique('uq_graph_edges_sim_relation').on(
+      table.simulationId,
+      table.sourceNodeId,
+      table.targetNodeId,
+      table.edgeType,
+    ),
   ],
 );
 
@@ -162,12 +168,14 @@ export const agentEpisodes = pgTable(
     actionType: varchar('action_type', { length: 50 }).notNull(),
     content: text('content').notNull(),
     embedding: vector('embedding'),
+    sourceKey: varchar('source_key', { length: 512 }),
     metadata: jsonb('metadata').notNull().default({}),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('idx_episodes_tenant_sim').on(table.tenantId, table.simulationId),
     index('idx_episodes_agent').on(table.simulationId, table.agentId, table.roundNumber),
+    unique('uq_agent_episodes_sim_source').on(table.simulationId, table.sourceKey),
   ],
 );
 

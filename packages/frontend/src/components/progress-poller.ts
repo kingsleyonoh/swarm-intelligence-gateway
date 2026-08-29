@@ -95,8 +95,8 @@ export class ProgressPoller {
       if (!data.isActive) {
         this.stop(simId);
       }
-    } catch {
-      // Network errors: stop polling to avoid log spam
+    } catch (error) {
+      console.warn('[swarm] Progress polling stopped:', error);
       this.stop(simId);
     }
   }

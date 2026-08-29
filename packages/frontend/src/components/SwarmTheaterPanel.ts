@@ -9,18 +9,10 @@
 import type { Panel } from '../types.js';
 import type { TheaterCardData, TheaterDomain } from './theater-types.js';
 import { THEATER_DOMAINS } from './theater-types.js';
-import {
-  createFactionSplitBar,
-  createSimulationPulse,
-} from './theater-helpers.js';
 import { createReportView } from './report-view.js';
 import { createLiveFeed } from './live-feed.js';
-import { createActiveSimCard } from './sim-card-active.js';
 import { ProgressPoller } from './progress-poller.js';
-
-const ACTIVE_SIM_STATUSES = new Set([
-  'pending', 'queued', 'graph_building', 'simulating', 'reporting',
-]);
+import { buildTheaterCard } from './theater-card-renderer.js';
 
 export interface TheaterPanelConfig {
   apiKey: string;
@@ -162,117 +154,10 @@ export class SwarmTheaterPanel implements Panel {
     }
 
     for (const cardData of this.cards) {
-      this.gridEl.appendChild(this.buildCard(cardData));
+      this.gridEl.appendChild(buildTheaterCard(cardData, () => this.expandCard(cardData.id)));
     }
 
     this.applyFilter();
-  }
-
-  private buildCard(data: TheaterCardData): HTMLElement {
-    // Skip active simulations — the swarm hero handles the live visualization
-    const isActive = ACTIVE_SIM_STATUSES.has(data.status ?? '');
-    if (isActive) {
-      const skip = document.createElement('div');
-      skip.style.display = 'none';
-      return skip;
-    }
-
-    const card = document.createElement('div');
-    card.className = 'theater-card';
-    card.dataset.domain = data.domain;
-    card.dataset.cardId = data.id;
-
-    // Fallback pulse for any non-active status with progress
-    const pulse = createSimulationPulse(data.status);
-    if (pulse) {
-      card.classList.add('theater-card--simulating');
-      card.appendChild(pulse);
-    }
-
-    // Prediction type badge + confidence — the hero
-    const predHeader = document.createElement('div');
-    predHeader.className = 'prediction-header';
-
-    const typeBadge = document.createElement('span');
-    typeBadge.className = `prediction-type-badge prediction-type--${(data.predictionType || 'unknown').toLowerCase().replace(/\s+/g, '-')}`;
-    typeBadge.textContent = data.predictionType || 'Analysis';
-    predHeader.appendChild(typeBadge);
-
-    const confEl = document.createElement('span');
-    confEl.className = 'prediction-confidence';
-    confEl.textContent = `${Math.round(data.confidence * 100)}%`;
-    predHeader.appendChild(confEl);
-
-    if (data.timeHorizon) {
-      const horizon = document.createElement('span');
-      horizon.className = 'prediction-horizon';
-      horizon.textContent = data.timeHorizon;
-      predHeader.appendChild(horizon);
-    }
-
-    // "NEW" badge for predictions less than 1 hour old
-    const ageMs = data.predictedAt ? Date.now() - new Date(data.predictedAt).getTime() : Infinity;
-    if (ageMs < 3600000) {
-      const newBadge = document.createElement('span');
-      newBadge.className = 'prediction-new-badge';
-      newBadge.textContent = 'NEW';
-      predHeader.appendChild(newBadge);
-      card.classList.add('theater-card--new');
-    }
-
-    card.appendChild(predHeader);
-
-    // Theater name
-    const name = document.createElement('h3');
-    name.textContent = data.theater;
-    card.appendChild(name);
-
-    // Prediction summary — the core value
-    const pred = document.createElement('p');
-    pred.className = 'top-prediction';
-    pred.textContent = data.topPrediction;
-    card.appendChild(pred);
-
-    // Meta row: agent count + freshness
-    const meta = document.createElement('div');
-    meta.className = 'card-meta';
-
-    const badge = document.createElement('span');
-    badge.className = 'agent-count-badge';
-    badge.textContent = `${data.agentCount.toLocaleString()} agents`;
-    meta.appendChild(badge);
-
-    const freshness = document.createElement('span');
-    freshness.className = 'prediction-freshness';
-    freshness.textContent = this.formatFreshness(data.predictedAt);
-    meta.appendChild(freshness);
-
-    if (data.signalCount && data.signalCount > 0) {
-      const signals = document.createElement('span');
-      signals.className = 'signal-attribution';
-      signals.textContent = `Based on ${data.signalCount} intelligence signals`;
-      meta.appendChild(signals);
-    }
-
-    card.appendChild(meta);
-
-    // Faction split bar
-    card.appendChild(createFactionSplitBar(data.factionSplit));
-
-    card.addEventListener('click', () => this.expandCard(data.id));
-
-    return card;
-  }
-
-  private formatFreshness(dateStr: string): string {
-    if (!dateStr) return '';
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
   }
 
   private expandCard(cardId: string): void {

@@ -67,6 +67,73 @@ describe('parseSimPackage', () => {
     expect(result.simulationRequirement).toContain('cascading effects');
   });
 
+  it('should normalize the current WorldMonitor simulation package shape', () => {
+    const raw = {
+      schemaVersion: 'simulation-package.v2',
+      runId: 'wm-current-001',
+      generatedAt: Date.parse('2026-08-28T10:00:00Z'),
+      simulationRequirement: {
+        'theater-1': 'Model maritime disruption and market spillover.',
+      },
+      selectedTheaters: [
+        {
+          theaterId: 'theater-1',
+          candidateStateId: 'state-1',
+          label: 'Strait of Hormuz',
+          stateKind: 'maritime_disruption',
+          dominantRegion: 'Middle East',
+          macroRegions: ['Middle East'],
+          routeFacilityKey: 'strait_of_hormuz',
+          commodityKey: 'crude_oil',
+          rankingScore: 0.88,
+        },
+      ],
+      entities: [
+        {
+          entityId: 'entity-1',
+          name: 'Iranian Navy',
+          class: 'state_actor',
+          region: 'Middle East',
+          stance: 'active',
+          objectives: ['Control shipping'],
+          constraints: ['Avoid escalation'],
+        },
+      ],
+      eventSeeds: [
+        {
+          seedId: 'seed-1',
+          theaterId: 'theater-1',
+          type: 'observed_disruption',
+          summary: 'Shipping disruption is under elevated pressure.',
+          timing: 'T+0h',
+          strength: 0.8,
+        },
+      ],
+      constraints: {
+        'theater-1': [
+          { statement: 'Crude oil is the exposed commodity.', hard: true },
+          { statement: 'Bound market impacts to current evidence.', hard: false },
+        ],
+      },
+    };
+
+    const result = parseSimPackage(raw);
+
+    expect(result.title).toContain('Strait of Hormuz');
+    expect(result.timestamp).toBe('2026-08-28T10:00:00.000Z');
+    expect(result.selectedTheaters[0]).toMatchObject({
+      label: 'Strait of Hormuz',
+      region: 'Middle East',
+      route: 'strait_of_hormuz',
+      commodity: 'crude_oil',
+    });
+    expect(result.entities[0].relationships).toEqual([]);
+    expect(result.constraints).toEqual({
+      hard: ['Crude oil is the exposed commodity.'],
+      soft: ['Bound market impacts to current evidence.'],
+    });
+  });
+
   it('should parse all theater fields', () => {
     const result = parseSimPackage(validPackage());
 

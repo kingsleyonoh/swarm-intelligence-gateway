@@ -6,22 +6,18 @@
  *   GET /api/simulations/:id/agents/summary  — stance distribution from predictions
  */
 
-import { and, count, eq } from 'drizzle-orm';
-import { z } from 'zod';
+import { and, count, desc, eq, lt, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 
 import { db } from '../../shared/db.js';
 import { NotFoundError, ValidationError } from '../../shared/errors.js';
-import { uuidSchema } from '../../shared/validation.js';
-import { agentProfiles, predictions, simulations } from '../../db/schema/tables.js';
-import { authGuard, type RequestTenant } from '../middleware/auth.js';
+import { paginationSchema, uuidSchema } from '../../shared/validation.js';
+import { agentProfiles, simulations } from '../../db/schema/tables.js';
+import { authGuard, requireTenant } from '../middleware/auth.js';
 
 // ── Request Schemas ────────────────────────────────────────────────────
 
-const agentListSchema = z.object({
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-  offset: z.coerce.number().int().min(0).default(0),
-});
+const agentListSchema = paginationSchema.strict();
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -38,14 +34,38 @@ async function verifySimulation(simId: string, tenantId: string): Promise<void> 
 }
 
 /** Map prediction types to stance categories. */
-function predictionTypeToStance(type: string): string {
-  switch (type) {
-    case 'escalation': return 'escalate';
-    case 'de_escalation': return 'de_escalate';
-    case 'market_shift':
-    case 'sentiment_cascade': return 'uncertain';
-    default: return 'neutral';
+type StanceCategory = 'escalate' | 'de_escalate' | 'uncertain' | 'neutral';
+
+function normalizeStance(value: string | null): StanceCategory {
+  const stance = value?.trim().toLowerCase().replace(/[\s-]+/g, '_') ?? '';
+  if (stance === 'de_escalate' || /peace|diplomat|dove|reconcil|de_escalat/.test(stance)) {
+    return 'de_escalate';
   }
+  if (stance === 'escalate' || /escalat|aggress|hawk|militant|confront/.test(stance)) {
+    return 'escalate';
+  }
+  if (stance === 'uncertain' || /ambivalent|mixed|unknown/.test(stance)) return 'uncertain';
+  return 'neutral';
+}
+
+function stancePercentages(profiles: Array<{ stance: string | null }>): Record<StanceCategory, number> {
+  const counts: Record<StanceCategory, number> = {
+    escalate: 0, de_escalate: 0, uncertain: 0, neutral: 0,
+  };
+  for (const profile of profiles) counts[normalizeStance(profile.stance)]++;
+  if (profiles.length === 0) return counts;
+
+  const percentages = (Object.keys(counts) as StanceCategory[]).reduce((result, category) => {
+    result[category] = Math.round((counts[category] / profiles.length) * 100);
+    return result;
+  }, { ...counts });
+  const sum = Object.values(percentages).reduce((total, value) => total + value, 0);
+  if (sum !== 100) {
+    const largest = (Object.keys(counts) as StanceCategory[])
+      .reduce((current, category) => counts[category] > counts[current] ? category : current, 'neutral');
+    percentages[largest] += 100 - sum;
+  }
+  return percentages;
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────
@@ -56,7 +76,7 @@ export async function agentDataRoutes(app: FastifyInstance): Promise<void> {
     '/api/simulations/:id/agents',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const idParse = uuidSchema.safeParse(request.params.id);
       if (!idParse.success) {
@@ -68,17 +88,39 @@ export async function agentDataRoutes(app: FastifyInstance): Promise<void> {
       if (!queryParse.success) {
         throw new ValidationError('Invalid query parameters');
       }
-      const { limit, offset } = queryParse.data;
+      const { cursor, limit } = queryParse.data;
 
       await verifySimulation(simId, tenant.id);
 
-      const [totalResult, rows] = await Promise.all([
-        db.select({ count: count() })
+      const conditions = [
+        eq(agentProfiles.simulationId, simId),
+        eq(agentProfiles.tenantId, tenant.id),
+      ];
+      if (cursor) {
+        const [cursorRow] = await db
+          .select({ id: agentProfiles.id, createdAt: agentProfiles.createdAt })
           .from(agentProfiles)
           .where(and(
+            eq(agentProfiles.id, cursor),
             eq(agentProfiles.simulationId, simId),
             eq(agentProfiles.tenantId, tenant.id),
-          )),
+          ));
+        if (cursorRow) {
+          const cursorCondition = or(
+            lt(agentProfiles.createdAt, cursorRow.createdAt),
+            and(
+              eq(agentProfiles.createdAt, cursorRow.createdAt),
+              lt(agentProfiles.id, cursorRow.id),
+            ),
+          );
+          if (cursorCondition) conditions.push(cursorCondition);
+        }
+      }
+
+      const [totalResult, fetchedRows] = await Promise.all([
+        db.select({ count: count() })
+          .from(agentProfiles)
+          .where(and(eq(agentProfiles.simulationId, simId), eq(agentProfiles.tenantId, tenant.id))),
         db.select({
           id: agentProfiles.id,
           agentId: agentProfiles.agentId,
@@ -91,17 +133,18 @@ export async function agentDataRoutes(app: FastifyInstance): Promise<void> {
           influenceWeight: agentProfiles.influenceWeight,
         })
           .from(agentProfiles)
-          .where(and(
-            eq(agentProfiles.simulationId, simId),
-            eq(agentProfiles.tenantId, tenant.id),
-          ))
-          .limit(limit)
-          .offset(offset),
+          .where(and(...conditions))
+          .orderBy(desc(agentProfiles.createdAt), desc(agentProfiles.id))
+          .limit(limit + 1),
       ]);
+
+      const hasMore = fetchedRows.length > limit;
+      const rows = hasMore ? fetchedRows.slice(0, limit) : fetchedRows;
 
       return reply.send({
         data: rows,
         total: totalResult[0]?.count ?? 0,
+        nextCursor: hasMore ? rows[rows.length - 1]?.id ?? null : null,
       });
     },
   );
@@ -111,7 +154,7 @@ export async function agentDataRoutes(app: FastifyInstance): Promise<void> {
     '/api/simulations/:id/agents/summary',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const idParse = uuidSchema.safeParse(request.params.id);
       if (!idParse.success) {
@@ -121,63 +164,19 @@ export async function agentDataRoutes(app: FastifyInstance): Promise<void> {
 
       await verifySimulation(simId, tenant.id);
 
-      // Derive stance distribution from predictions, weighted by confidence
-      const preds = await db
+      const profiles = await db
         .select({
-          predictionType: predictions.predictionType,
-          confidence: predictions.confidence,
+          stance: agentProfiles.stance,
         })
-        .from(predictions)
+        .from(agentProfiles)
         .where(and(
-          eq(predictions.simulationId, simId),
-          eq(predictions.tenantId, tenant.id),
+          eq(agentProfiles.simulationId, simId),
+          eq(agentProfiles.tenantId, tenant.id),
         ));
 
-      if (preds.length === 0) {
-        return reply.send({
-          total: 0,
-          stances: { escalate: 0, de_escalate: 0, uncertain: 0, neutral: 0 },
-        });
-      }
-
-      // Weight each prediction by confidence
-      const weights: Record<string, number> = {
-        escalate: 0, de_escalate: 0, uncertain: 0, neutral: 0,
-      };
-      let totalWeight = 0;
-
-      for (const pred of preds) {
-        const stance = predictionTypeToStance(pred.predictionType);
-        const conf = Number(pred.confidence);
-        weights[stance] += conf;
-        totalWeight += conf;
-      }
-
-      // Convert to percentages
-      const stances = totalWeight > 0
-        ? {
-            escalate: Math.round((weights.escalate / totalWeight) * 100),
-            de_escalate: Math.round((weights.de_escalate / totalWeight) * 100),
-            uncertain: Math.round((weights.uncertain / totalWeight) * 100),
-            neutral: Math.round((weights.neutral / totalWeight) * 100),
-          }
-        : { escalate: 0, de_escalate: 0, uncertain: 0, neutral: 0 };
-
-      // Adjust rounding so it sums to exactly 100
-      const sum = stances.escalate + stances.de_escalate + stances.uncertain + stances.neutral;
-      if (sum !== 100 && totalWeight > 0) {
-        const diff = 100 - sum;
-        // Add the rounding difference to the largest category
-        const max = Math.max(stances.escalate, stances.de_escalate, stances.uncertain, stances.neutral);
-        if (stances.escalate === max) stances.escalate += diff;
-        else if (stances.de_escalate === max) stances.de_escalate += diff;
-        else if (stances.uncertain === max) stances.uncertain += diff;
-        else stances.neutral += diff;
-      }
-
       return reply.send({
-        total: preds.length,
-        stances,
+        total: profiles.length,
+        stances: stancePercentages(profiles),
       });
     },
   );

@@ -304,7 +304,7 @@ describe('graph-store', () => {
       const { fromMock } = mockSelectReturning(rows);
       mocks.dbSelect.mockReturnValue({ from: fromMock });
 
-      const result = await getNodesByType(SIM_ID, 'StateActor');
+      const result = await getNodesByType(TENANT_ID, SIM_ID, 'StateActor');
 
       expect(result).toHaveLength(2);
       expect(mocks.dbSelect).toHaveBeenCalledTimes(1);
@@ -314,7 +314,7 @@ describe('graph-store', () => {
       const { fromMock } = mockSelectReturning([]);
       mocks.dbSelect.mockReturnValue({ from: fromMock });
 
-      const result = await getNodesByType(SIM_ID, 'NoSuchType');
+      const result = await getNodesByType(TENANT_ID, SIM_ID, 'NoSuchType');
 
       expect(result).toEqual([]);
     });
@@ -329,7 +329,7 @@ describe('graph-store', () => {
         { id: NODE_ID_C, tenant_id: TENANT_ID, simulation_id: SIM_ID, entity_id: 'c', entity_type: 'Faction', name: 'C', properties: {}, embedding: null },
       ]);
 
-      const neighbors = await getNeighbors(NODE_ID_A, 1);
+      const neighbors = await getNeighbors(TENANT_ID, NODE_ID_A, 1);
 
       expect(mocks.dbExecute).toHaveBeenCalledTimes(1);
       expect(neighbors).toHaveLength(2);
@@ -338,7 +338,7 @@ describe('graph-store', () => {
     it('should default depth to 1 when not specified', async () => {
       mocks.dbExecute.mockResolvedValue([]);
 
-      await getNeighbors(NODE_ID_A);
+      await getNeighbors(TENANT_ID, NODE_ID_A);
 
       expect(mocks.dbExecute).toHaveBeenCalledTimes(1);
     });
@@ -346,7 +346,7 @@ describe('graph-store', () => {
     it('should support deeper traversal (depth = 2)', async () => {
       mocks.dbExecute.mockResolvedValue([]);
 
-      await getNeighbors(NODE_ID_A, 2);
+      await getNeighbors(TENANT_ID, NODE_ID_A, 2);
 
       expect(mocks.dbExecute).toHaveBeenCalledTimes(1);
     });
@@ -354,7 +354,7 @@ describe('graph-store', () => {
     it('should return empty array when node has no neighbors', async () => {
       mocks.dbExecute.mockResolvedValue([]);
 
-      const result = await getNeighbors(NODE_ID_A, 1);
+      const result = await getNeighbors(TENANT_ID, NODE_ID_A, 1);
 
       expect(result).toEqual([]);
     });
@@ -378,7 +378,7 @@ describe('graph-store', () => {
         },
       ]);
 
-      const results = await searchEpisodes(SIM_ID, 42, 'escalation in Persian Gulf', 5);
+      const results = await searchEpisodes(TENANT_ID, SIM_ID, 42, 'escalation in Persian Gulf', 5);
 
       expect(mocks.generateEmbedding).toHaveBeenCalledWith('escalation in Persian Gulf');
       expect(mocks.dbExecute).toHaveBeenCalledTimes(1);
@@ -392,7 +392,7 @@ describe('graph-store', () => {
         { id: 'ep1', tenant_id: TENANT_ID, simulation_id: SIM_ID, agent_id: 1, round_number: 1, action_type: 'post', content: 'x', metadata: {}, distance: 0.3 },
       ]);
 
-      const results = await searchEpisodes(SIM_ID, 1, 'query', 5);
+      const results = await searchEpisodes(TENANT_ID, SIM_ID, 1, 'query', 5);
 
       expect(results[0].similarity).toBeCloseTo(0.7, 5);
     });
@@ -404,7 +404,7 @@ describe('graph-store', () => {
         { id: 'ep2', tenant_id: TENANT_ID, simulation_id: SIM_ID, agent_id: 1, round_number: 2, action_type: 'post', content: 'farther', metadata: {}, distance: 0.4 },
       ]);
 
-      const results = await searchEpisodes(SIM_ID, 1, 'q', 10);
+      const results = await searchEpisodes(TENANT_ID, SIM_ID, 1, 'q', 10);
 
       expect(results[0].similarity).toBeGreaterThan(results[1].similarity);
     });
@@ -413,7 +413,7 @@ describe('graph-store', () => {
       mocks.generateEmbedding.mockResolvedValue(fakeEmbedding(0.2));
       mocks.dbExecute.mockResolvedValue([]);
 
-      await searchEpisodes(SIM_ID, null, 'query', 10);
+      await searchEpisodes(TENANT_ID, SIM_ID, null, 'query', 10);
 
       expect(mocks.dbExecute).toHaveBeenCalledTimes(1);
     });
@@ -422,7 +422,7 @@ describe('graph-store', () => {
       mocks.generateEmbedding.mockResolvedValue(fakeEmbedding(0.2));
       mocks.dbExecute.mockResolvedValue([]);
 
-      await searchEpisodes(SIM_ID, 1, 'q');
+      await searchEpisodes(TENANT_ID, SIM_ID, 1, 'q');
 
       expect(mocks.dbExecute).toHaveBeenCalledTimes(1);
     });
@@ -438,7 +438,7 @@ describe('graph-store', () => {
       const { fromMock, chain } = mockSelectReturning(rows);
       mocks.dbSelect.mockReturnValue({ from: fromMock });
 
-      const result = await getAgentMemory(SIM_ID, 42);
+      const result = await getAgentMemory(TENANT_ID, SIM_ID, 42);
 
       expect(result).toHaveLength(2);
       expect(mocks.dbSelect).toHaveBeenCalledTimes(1);
@@ -450,7 +450,7 @@ describe('graph-store', () => {
       const { fromMock } = mockSelectReturning([]);
       mocks.dbSelect.mockReturnValue({ from: fromMock });
 
-      const result = await getAgentMemory(SIM_ID, 999);
+      const result = await getAgentMemory(TENANT_ID, SIM_ID, 999);
 
       expect(result).toEqual([]);
     });

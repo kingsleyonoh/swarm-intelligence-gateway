@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyError } from 'fastify';
 
 import { AppError } from '../../shared/errors.js';
 import { logger } from '../../shared/logger.js';
+import { captureError } from '../../shared/sentry.js';
 
 /**
  * Register the global error handler on the Fastify instance.
@@ -33,6 +34,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
     }
 
     // Unknown / unexpected errors — log full error, return safe response
+    captureError(error, { method: request.method, url: request.url });
     logger.error(error, 'Unhandled error');
 
     return reply.status(500).send({

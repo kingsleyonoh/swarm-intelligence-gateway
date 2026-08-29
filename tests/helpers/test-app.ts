@@ -52,7 +52,7 @@ export async function cleanupTestTenant(apiKeyHash: string): Promise<void> {
  */
 export async function isDatabaseAvailable(): Promise<boolean> {
   try {
-    await db.execute('SELECT 1' as any);
+    await db.execute('SELECT 1');
     return true;
   } catch {
     return false;

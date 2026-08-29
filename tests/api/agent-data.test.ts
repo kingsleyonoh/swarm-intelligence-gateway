@@ -193,7 +193,7 @@ describe('Agent Data API', () => {
       expect(body.total).toBe(0);
     });
 
-    it('should respect limit and offset pagination', async () => {
+    it('should paginate profiles with a cursor', async () => {
       const scenario = await createTestScenario(testTenant.id);
       createdScenarioIds.push(scenario.id);
 
@@ -206,7 +206,7 @@ describe('Agent Data API', () => {
 
       const response = await app.inject({
         method: 'GET',
-        url: `/api/simulations/${sim.id}/agents?limit=2&offset=1`,
+        url: `/api/simulations/${sim.id}/agents?limit=2`,
         headers: { 'x-api-key': testTenant.apiKey },
       });
 
@@ -214,6 +214,34 @@ describe('Agent Data API', () => {
       const body = response.json();
       expect(body.data).toHaveLength(2);
       expect(body.total).toBe(5);
+      expect(body.nextCursor).toEqual(expect.any(String));
+
+      const nextResponse = await app.inject({
+        method: 'GET',
+        url: `/api/simulations/${sim.id}/agents?limit=2&cursor=${body.nextCursor}`,
+        headers: { 'x-api-key': testTenant.apiKey },
+      });
+
+      expect(nextResponse.statusCode).toBe(200);
+      const nextBody = nextResponse.json();
+      expect(nextBody.data).toHaveLength(2);
+      expect(nextBody.data.map((profile: { id: string }) => profile.id))
+        .not.toEqual(expect.arrayContaining(body.data.map((profile: { id: string }) => profile.id)));
+    });
+
+    it('should reject offset pagination so list reads stay cursor-based', async () => {
+      const scenario = await createTestScenario(testTenant.id);
+      createdScenarioIds.push(scenario.id);
+      const sim = await createTestSimulation(testTenant.id, scenario.id);
+      createdSimulationIds.push(sim.id);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/simulations/${sim.id}/agents?offset=1`,
+        headers: { 'x-api-key': testTenant.apiKey },
+      });
+
+      expect(response.statusCode).toBe(400);
     });
 
     it('should return 404 for non-existent simulation', async () => {
@@ -251,17 +279,17 @@ describe('Agent Data API', () => {
   // ── GET /api/simulations/:id/agents/summary ─────────────────────────
 
   describe('GET /api/simulations/:id/agents/summary', () => {
-    it('should return stance distribution from predictions', async () => {
+    it('should return stance distribution from stored agent profiles', async () => {
       const scenario = await createTestScenario(testTenant.id);
       createdScenarioIds.push(scenario.id);
 
       const sim = await createTestSimulation(testTenant.id, scenario.id);
       createdSimulationIds.push(sim.id);
 
-      // Create predictions of different types
-      await createTestPrediction(testTenant.id, sim.id, 'escalation', '0.8');
-      await createTestPrediction(testTenant.id, sim.id, 'de_escalation', '0.6');
-      await createTestPrediction(testTenant.id, sim.id, 'market_shift', '0.4');
+      await createTestProfile(testTenant.id, sim.id, 1, 'hawk-1', 'escalate');
+      await createTestProfile(testTenant.id, sim.id, 2, 'hawk-2', 'aggressive');
+      await createTestProfile(testTenant.id, sim.id, 3, 'dove-1', 'de_escalate');
+      await createTestProfile(testTenant.id, sim.id, 4, 'neutral-1', 'neutral');
 
       const response = await app.inject({
         method: 'GET',
@@ -278,7 +306,15 @@ describe('Agent Data API', () => {
       expect(typeof body.stances.uncertain).toBe('number');
       expect(typeof body.stances.neutral).toBe('number');
 
-      // Sum of stances should be ~100 (allow rounding)
+      expect(body.total).toBe(4);
+      expect(body.stances).toEqual({
+        escalate: 50,
+        de_escalate: 25,
+        uncertain: 0,
+        neutral: 25,
+      });
+
+      // Sum of stances should be exactly 100
       const sum = body.stances.escalate
         + body.stances.de_escalate
         + body.stances.uncertain

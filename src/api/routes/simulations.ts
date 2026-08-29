@@ -13,7 +13,7 @@
  */
 
 import { z } from 'zod';
-import { and, desc, eq, lt } from 'drizzle-orm';
+import { and, desc, eq, lt, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 
 import { db } from '../../shared/db.js';
@@ -23,7 +23,7 @@ import { paginationSchema, uuidSchema } from '../../shared/validation.js';
 import { scenarios, simulations } from '../../db/schema/tables.js';
 import { SIMULATION_STATUS } from '../../config/constants.js';
 import { env } from '../../config/env.js';
-import { authGuard, type RequestTenant } from '../middleware/auth.js';
+import { authGuard, requireTenant } from '../middleware/auth.js';
 
 // ── Request Schemas ────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@ export async function simulationRoutes(app: FastifyInstance): Promise<void> {
     '/api/simulations',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const parsed = createSimulationSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -117,7 +117,7 @@ export async function simulationRoutes(app: FastifyInstance): Promise<void> {
     '/api/simulations',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const parsed = listSimulationsSchema.safeParse(request.query);
       if (!parsed.success) {
@@ -137,12 +137,19 @@ export async function simulationRoutes(app: FastifyInstance): Promise<void> {
 
       if (cursor) {
         const [cursorRow] = await db
-          .select({ createdAt: simulations.createdAt })
+          .select({ id: simulations.id, createdAt: simulations.createdAt })
           .from(simulations)
-          .where(eq(simulations.id, cursor));
+          .where(and(eq(simulations.id, cursor), eq(simulations.tenantId, tenant.id)));
 
         if (cursorRow) {
-          conditions.push(lt(simulations.createdAt, cursorRow.createdAt));
+          const cursorCondition = or(
+            lt(simulations.createdAt, cursorRow.createdAt),
+            and(
+              eq(simulations.createdAt, cursorRow.createdAt),
+              lt(simulations.id, cursorRow.id),
+            ),
+          );
+          if (cursorCondition) conditions.push(cursorCondition);
         }
       }
 
@@ -162,7 +169,7 @@ export async function simulationRoutes(app: FastifyInstance): Promise<void> {
         })
         .from(simulations)
         .where(and(...conditions))
-        .orderBy(desc(simulations.createdAt))
+        .orderBy(desc(simulations.createdAt), desc(simulations.id))
         .limit(limit + 1);
 
       const hasMore = rows.length > limit;
@@ -178,7 +185,7 @@ export async function simulationRoutes(app: FastifyInstance): Promise<void> {
     '/api/simulations/:id',
     { preHandler: [authGuard] },
     async (request, reply) => {
-      const tenant = (request as any).tenant as RequestTenant;
+      const tenant = requireTenant(request);
 
       const idParse = uuidSchema.safeParse(request.params.id);
       if (!idParse.success) {
@@ -192,6 +199,7 @@ export async function simulationRoutes(app: FastifyInstance): Promise<void> {
           scenarioId: simulations.scenarioId,
           status: simulations.status,
           mirofishProjectId: simulations.mirofishProjectId,
+          mirofishSimId: simulations.mirofishSimId,
           agentCount: simulations.agentCount,
           roundCount: simulations.roundCount,
           llmProvider: simulations.llmProvider,

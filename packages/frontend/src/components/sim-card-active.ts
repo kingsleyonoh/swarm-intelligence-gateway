@@ -4,7 +4,7 @@
  */
 
 import type { TheaterCardData } from './theater-types.js';
-import { createSwarmCanvas, type SwarmCanvasController } from './swarm-canvas.js';
+import { createSwarmCanvas } from './swarm-canvas.js';
 import { formatElapsed } from './theater-helpers.js';
 
 const PHASE_TEXT: Record<string, string> = {

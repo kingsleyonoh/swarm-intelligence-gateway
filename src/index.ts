@@ -33,6 +33,7 @@ import { createSimulationWorker } from './jobs/run-simulation.js';
 import { startPollerCron } from './jobs/poll-worldmonitor.js';
 import { startCleanupCron } from './jobs/cleanup.js';
 import { tenants } from './db/schema.js';
+import { captureError, flushTelemetry, initTelemetry } from './shared/sentry.js';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ export interface ShutdownResources {
   queue?: { close: () => Promise<unknown> };
   closeRedis?: () => Promise<unknown>;
   closeDb?: () => Promise<unknown>;
+  flushTelemetry?: () => Promise<unknown>;
   /** Overridable for testing. Defaults to `process.exit`. */
   exit?: (code: number) => void;
 }
@@ -121,6 +123,11 @@ export function createShutdownHandler(resources: ShutdownResources) {
         logger.info('Database closed');
       }
 
+      if (resources.flushTelemetry) {
+        await resources.flushTelemetry();
+        logger.info('Telemetry flushed');
+      }
+
       logger.info('Shutdown complete');
       exit(0);
     } catch (err) {
@@ -141,6 +148,7 @@ export function createShutdownHandler(resources: ShutdownResources) {
  */
 export async function main(): Promise<void> {
   logger.info('Starting Swarm Intelligence Gateway...');
+  if (initTelemetry()) logger.info('Sentry telemetry enabled');
 
   // 1. Build Fastify app (routes + middleware already wired in buildApp)
   const app: FastifyInstance = buildApp({ logger: true });
@@ -192,6 +200,7 @@ export async function main(): Promise<void> {
     queue: simulationQueue,
     closeRedis,
     closeDb,
+    flushTelemetry,
   });
 
   // 6. Register signal handlers BEFORE starting the listener so we
@@ -203,6 +212,7 @@ export async function main(): Promise<void> {
     void shutdown('SIGINT');
   });
   process.on('uncaughtException', (err) => {
+    captureError(err, { source: 'uncaughtException' });
     logger.fatal(
       { error: err.message, stack: err.stack },
       'Uncaught exception',
@@ -210,6 +220,7 @@ export async function main(): Promise<void> {
     void shutdown('uncaughtException');
   });
   process.on('unhandledRejection', (reason) => {
+    captureError(reason, { source: 'unhandledRejection' });
     logger.fatal({ reason: String(reason) }, 'Unhandled rejection');
     void shutdown('unhandledRejection');
   });
@@ -219,6 +230,7 @@ export async function main(): Promise<void> {
     await app.listen({ port: env.PORT, host: '0.0.0.0' });
     logger.info({ port: env.PORT }, 'Server listening');
   } catch (err) {
+    captureError(err, { source: 'server.listen' });
     logger.error(
       { error: (err as Error).message },
       'Failed to start server',
@@ -240,13 +252,15 @@ function isDirectExecution(): boolean {
   try {
     const entryUrl = new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href;
     return import.meta.url === entryUrl;
-  } catch {
+  } catch (error) {
+    logger.debug({ error }, 'Could not determine direct module execution');
     return false;
   }
 }
 
 if (isDirectExecution()) {
   main().catch((err) => {
+    captureError(err, { source: 'main' });
     logger.fatal(
       { error: (err as Error).message, stack: (err as Error).stack },
       'Fatal error in main()',

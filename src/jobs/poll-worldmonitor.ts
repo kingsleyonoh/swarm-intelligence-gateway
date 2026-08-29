@@ -24,7 +24,7 @@ const log = createChildLogger({ module: 'poll-worldmonitor-cron' });
  * @returns The cron ScheduledTask (call `.stop()` for graceful shutdown).
  */
 export function startPollerCron(defaultTenantId: string): cron.ScheduledTask {
-  const cronExpression = `*/${env.POLL_INTERVAL_MINUTES} * * * *`;
+  const cronExpression = pollCronExpression(env.POLL_INTERVAL_MINUTES);
 
   log.info({ cronExpression, defaultTenantId }, 'Starting WorldMonitor poller cron');
 
@@ -46,4 +46,12 @@ export function startPollerCron(defaultTenantId: string): cron.ScheduledTask {
   });
 
   return task;
+}
+
+function pollCronExpression(intervalMinutes: number): string {
+  if (intervalMinutes < 60) return `*/${intervalMinutes} * * * *`;
+  const intervalHours = Math.max(1, Math.floor(intervalMinutes / 60));
+  if (intervalHours === 1) return '0 * * * *';
+  if (intervalHours < 24) return `0 */${intervalHours} * * *`;
+  return `0 0 */${Math.floor(intervalHours / 24)} * *`;
 }

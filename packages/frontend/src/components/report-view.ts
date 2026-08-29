@@ -19,8 +19,6 @@ const PREDICTION_BG: Record<string, string> = {
   sentiment_cascade: '#F5F0FF',
 };
 
-const CJK = /[\u4e00-\u9fff]/;
-
 /** Convert Markdown to structured HTML with enhanced formatting */
 function markdownToHtml(md: string): string {
   const lines = md.split('\n');
@@ -29,7 +27,7 @@ function markdownToHtml(md: string): string {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (!trimmed || CJK.test(trimmed)) continue;
+    if (!trimmed) continue;
     if (trimmed === '---') { result.push('<hr>'); continue; }
     if (trimmed.startsWith('## ')) {
       result.push(`<h3 class="report-section-heading">${esc(trimmed.slice(3))}</h3>`);
@@ -185,15 +183,14 @@ export function createReportView(
       const loadingEl = hero.querySelector('.report-loading');
       if (loadingEl) loadingEl.remove();
 
-      const englishPreds = data.predictions.filter((p) => !CJK.test(p.summary ?? ''));
-      if (englishPreds.length > 0) {
+      if (data.predictions.length > 0) {
         const count = document.createElement('span');
         count.className = 'report-hero-stat';
-        count.textContent = `${englishPreds.length} predictions extracted`;
+        count.textContent = `${data.predictions.length} predictions extracted`;
         hero.appendChild(count);
 
         // Predictions first — key takeaways before full report
-        container.insertBefore(buildPredictionsSummary(englishPreds), content);
+        container.insertBefore(buildPredictionsSummary(data.predictions), content);
       }
 
       content.innerHTML = markdownToHtml(data.report);
